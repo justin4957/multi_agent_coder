@@ -95,10 +95,11 @@ defmodule MultiAgentCoder.Agent.Worker do
 
     final_state = %{new_state | status: :idle, current_task: nil}
 
-    # Broadcast completion
-    broadcast_complete(state.provider, result)
+    # Normalize result format and broadcast completion
+    normalized_result = normalize_result(result)
+    broadcast_complete(state.provider, normalized_result)
 
-    {:reply, result, final_state}
+    {:reply, normalized_result, final_state}
   end
 
   @impl true
@@ -129,5 +130,28 @@ defmodule MultiAgentCoder.Agent.Worker do
       "agent:#{provider}",
       {:task_complete, result}
     )
+  end
+
+  # Normalize different result formats from providers
+  # New format: {:ok, content, usage} or {:error, reason}
+  # Old format: {:ok, content} or {:error, reason}
+  defp normalize_result({:ok, content, _usage}) when is_binary(content) do
+    # New format with usage statistics - just return content for compatibility
+    {:ok, content}
+  end
+
+  defp normalize_result({:ok, content}) when is_binary(content) do
+    # Old format - pass through
+    {:ok, content}
+  end
+
+  defp normalize_result({:error, _reason} = error) do
+    # Error - pass through
+    error
+  end
+
+  defp normalize_result(other) do
+    # Unexpected format
+    {:error, {:unexpected_response_format, other}}
   end
 end
