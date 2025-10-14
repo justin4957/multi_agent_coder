@@ -265,7 +265,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
   defp format_provider_config(%{name: name, model: model, api_key: api_key}) do
     """
-        #{inspect(name)}: [
+        #{name}: [
           model: #{inspect(model)},
           api_key: #{inspect(api_key)},
           temperature: 0.1,
