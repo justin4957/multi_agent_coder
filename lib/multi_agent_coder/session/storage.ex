@@ -387,7 +387,7 @@ defmodule MultiAgentCoder.Session.Storage do
       {:ok, json} ->
         case Jason.decode(json, keys: :atoms) do
           {:ok, session_data} ->
-            session = struct(Session, session_data)
+            session = deserialize_session(session_data)
             :ets.insert(state.sessions_table, {session_id, session})
             {:reply, {:ok, session}, state}
 
@@ -428,7 +428,7 @@ defmodule MultiAgentCoder.Session.Storage do
           {:ok, session_data} ->
             # Generate new ID to avoid conflicts
             new_id = generate_session_id(state.session_id_counter)
-            session = struct(Session, Map.put(session_data, :id, new_id))
+            session = deserialize_session(Map.put(session_data, :id, new_id))
 
             :ets.insert(state.sessions_table, {new_id, session})
 
@@ -534,6 +534,36 @@ defmodule MultiAgentCoder.Session.Storage do
 
       [] ->
         {:error, :session_not_found}
+    end
+  end
+
+  defp deserialize_session(session_data) do
+    # Convert datetime strings to DateTime structs
+    session_data = session_data
+    |> Map.update(:created_at, nil, &parse_datetime/1)
+    |> Map.update(:last_accessed_at, nil, &parse_datetime/1)
+
+    # Convert messages
+    messages = session_data
+    |> Map.get(:messages, [])
+    |> Enum.map(&deserialize_message/1)
+
+    session_data = Map.put(session_data, :messages, messages)
+
+    struct(Session, session_data)
+  end
+
+  defp deserialize_message(message_data) when is_map(message_data) do
+    message_data = Map.update(message_data, :timestamp, nil, &parse_datetime/1)
+    struct(Message, message_data)
+  end
+
+  defp parse_datetime(nil), do: nil
+  defp parse_datetime(%DateTime{} = dt), do: dt
+  defp parse_datetime(string) when is_binary(string) do
+    case DateTime.from_iso8601(string) do
+      {:ok, datetime, _offset} -> datetime
+      {:error, _} -> nil
     end
   end
 end
