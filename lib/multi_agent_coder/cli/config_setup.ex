@@ -110,7 +110,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
   defp configure_provider(%{name: name, display_name: display_name, optional: optional} = provider) do
     IO.puts(IO.ANSI.cyan() <> "\n─────────────────────────────────────────" <> IO.ANSI.reset())
-    IO.puts(IO.ANSI.bold() <> "Configure #{display_name}" <> IO.ANSI.reset())
+    IO.puts(IO.ANSI.bright() <> "Configure #{display_name}" <> IO.ANSI.reset())
 
     if optional do
       IO.puts(IO.ANSI.yellow() <> "(Optional - press Enter to skip)" <> IO.ANSI.reset())
