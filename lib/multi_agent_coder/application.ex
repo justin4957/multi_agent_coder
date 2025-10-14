@@ -28,6 +28,9 @@ defmodule MultiAgentCoder.Application do
       # Agent supervisor - manages all AI agent processes
       MultiAgentCoder.Agent.Supervisor,
 
+      # Session storage - persistent session management
+      MultiAgentCoder.Session.Storage,
+
       # Session manager - maintains conversation state
       MultiAgentCoder.Session.Manager,
 
