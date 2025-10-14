@@ -293,6 +293,154 @@ results = MultiAgentCoder.Router.TaskRouter.route_task(
 )
 ```
 
+## Session Persistence and Multipath Exploration
+
+MultiAgent Coder provides powerful session management with ETS-based storage, file persistence, and multipath exploration capabilities inspired by distributed graph database patterns.
+
+### Core Features
+
+- **🔥 ETS Hot Storage**: Sub-millisecond session access for active conversations
+- **💾 File Persistence**: Durable storage with JSON export/import
+- **🌲 Session Forking**: Branch conversations to explore alternative solutions
+- **🔍 Tag-based Search**: Find sessions by tags, dates, or metadata
+- **📊 Usage Tracking**: Monitor tokens, costs, and provider usage
+- **🎯 Graph-Ready**: Compatible with future Grapple integration
+
+### Basic Session Operations
+
+```elixir
+# Create a session with metadata
+{:ok, session_id} = MultiAgentCoder.Session.Storage.create_session(%{
+  tags: ["feature", "authentication"],
+  description: "Building auth system"
+})
+
+# Add messages to the session
+MultiAgentCoder.Session.Storage.add_message(session_id, %{
+  role: :user,
+  content: "How should I implement JWT authentication?",
+  provider: :openai,
+  tokens: 15
+})
+
+# Save session to disk
+{:ok, file_path} = MultiAgentCoder.Session.Storage.save_session_to_disk(session_id)
+
+# Export as JSON
+MultiAgentCoder.Session.Storage.export_session(session_id, "/path/to/export.json")
+```
+
+### Multipath Exploration
+
+Fork sessions to explore different solution approaches:
+
+```elixir
+# Main conversation about implementing a cache
+{:ok, session_id} = Storage.create_session(%{tags: ["caching"]})
+Storage.add_message(session_id, %{role: :user, content: "I need a caching layer"})
+Storage.add_message(session_id, %{role: :assistant, content: "I recommend ETS..."})
+
+# Fork to explore alternative approach
+{:ok, fork1} = Storage.fork_session(session_id,
+  at_message: 1,
+  metadata: %{
+    fork_reason: "exploring Redis alternative",
+    strategy: :comparison
+  }
+)
+
+# Another fork for GenServer-based solution
+{:ok, fork2} = Storage.fork_session(session_id,
+  at_message: 1,
+  metadata: %{
+    fork_reason: "GenServer state approach",
+    strategy: :comparison
+  }
+)
+
+# Continue different paths independently
+Storage.add_message(fork1, %{role: :assistant, content: "Redis provides..."})
+Storage.add_message(fork2, %{role: :assistant, content: "GenServer caching..."})
+
+# Compare results
+{:ok, forks} = Storage.get_session_forks(session_id)  # => [fork1, fork2]
+```
+
+### Session Tree Navigation
+
+```elixir
+# Get all forks of a session
+{:ok, child_sessions} = Storage.get_session_forks(parent_id)
+
+# Get parent of a fork
+{:ok, parent_id} = Storage.get_session_parent(fork_id)
+
+# Navigate the session tree
+{:ok, session} = Storage.get_session(session_id)
+IO.inspect(session.parent_id)      # => parent session ID or nil
+IO.inspect(session.fork_point)     # => message index where fork occurred
+```
+
+### Search and Discovery
+
+```elixir
+# Find sessions by tag
+{:ok, auth_sessions} = Storage.find_sessions_by_tag("authentication")
+
+# Find sessions by date range
+{:ok, recent} = Storage.find_sessions_by_date_range(
+  ~U[2025-10-01 00:00:00Z],
+  ~U[2025-10-14 23:59:59Z]
+)
+
+# List all sessions
+{:ok, all_sessions} = Storage.list_sessions()
+
+# Get storage statistics
+stats = Storage.get_stats()
+# => %{
+#   total_sessions: 42,
+#   total_forks: 15,
+#   memory_usage: %{sessions: 1024000, indexes: 512000, forks: 256000}
+# }
+```
+
+### Session Metadata and Tracking
+
+Each session automatically tracks:
+
+```elixir
+%Session{
+  id: "session_1_1234567890",
+  parent_id: nil,                    # For forked sessions
+  fork_point: nil,                   # Message index of fork
+  created_at: ~U[2025-10-14 08:00:00Z],
+  last_accessed_at: ~U[2025-10-14 10:30:00Z],
+  access_count: 42,
+  messages: [...],                   # Full conversation history
+  metadata: %{tags: ["feature"], description: "..."},
+  providers_used: [:openai, :anthropic],
+  total_tokens: 1500,
+  estimated_cost: 0.045,
+  retention_policy: :standard
+}
+```
+
+### Future: Grapple Integration
+
+The session storage is designed to be compatible with Grapple's graph database:
+
+- **Graph Structure**: Sessions and forks form a natural graph
+- **Tiered Storage**: Easy migration to ETS → Mnesia → DETS tiers
+- **Query Patterns**: Tag-based indexing maps to graph queries
+- **Scalability**: Ready for distributed session storage
+
+This allows for future features like:
+- Distributed session replication
+- Complex graph queries across session trees
+- Advanced analytics on conversation patterns
+- Session clustering and recommendation
+
 ## Concurrent Coding Workflows
 
 ### Workflow 1: Parallel Feature Development

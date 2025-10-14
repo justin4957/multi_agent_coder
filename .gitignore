@@ -22,8 +22,8 @@ multi_agent_coder-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
-# Escript executable
-multi_agent_coder
+# Escript executable (root directory only)
+/multi_agent_coder
 
 # Environment files (if used)
 .env
