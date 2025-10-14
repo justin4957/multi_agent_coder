@@ -4,7 +4,7 @@
 
 > Concurrent multi-provider command-line interface for AI-powered coding
 
-MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI providers (OpenAI, Anthropic, Local LLMs) working **concurrently** on coding tasks. Allocate different parts of your project to different providers, monitor their progress in real-time, merge their code intelligently, and watch as multiple AI agents build your software simultaneously. Built with Elixir's robust concurrency model for true parallelism, fault tolerance, and real-time monitoring.
+MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI providers (OpenAI, Anthropic, DeepSeek, Local LLMs) working **concurrently** on coding tasks. Allocate different parts of your project to different providers, monitor their progress in real-time, merge their code intelligently, and watch as multiple AI agents build your software simultaneously. Built with Elixir's robust concurrency model for true parallelism, fault tolerance, and real-time monitoring.
 
 ## Features
 
