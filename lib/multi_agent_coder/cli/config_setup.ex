@@ -236,14 +236,15 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     # MultiAgent Coder Configuration
     # Generated on #{DateTime.utc_now() |> DateTime.to_string()}
 
-    import Config
-
-    config :multi_agent_coder,
-      providers: [
+    [
+      multi_agent_coder: [
+        providers: [
     #{generate_provider_configs(provider_configs)}
-      ],
-      default_strategy: :all,
-      timeout: 120_000
+        ],
+        default_strategy: :all,
+        timeout: 120_000
+      ]
+    ]
     """
   end
 
@@ -255,22 +256,22 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
   defp format_provider_config(%{name: :local, endpoint: endpoint, model: model}) do
     """
-        local: [
-          model: #{inspect(model)},
-          endpoint: #{inspect(endpoint)},
-          temperature: 0.1
-        ]
+              local: [
+                model: #{inspect(model)},
+                endpoint: #{inspect(endpoint)},
+                temperature: 0.1
+              ]
     """
   end
 
   defp format_provider_config(%{name: name, model: model, api_key: api_key}) do
     """
-        #{name}: [
-          model: #{inspect(model)},
-          api_key: #{inspect(api_key)},
-          temperature: 0.1,
-          max_tokens: 4096
-        ]
+              #{name}: [
+                model: #{inspect(model)},
+                api_key: #{inspect(api_key)},
+                temperature: 0.1,
+                max_tokens: 4096
+              ]
     """
   end
 
