@@ -8,7 +8,15 @@ defmodule MultiAgentCoder.MixProject do
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      escript: escript()
+      escript: escript(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ]
     ]
   end
 
@@ -33,7 +41,8 @@ defmodule MultiAgentCoder.MixProject do
       {:jason, "~> 1.4"},              # JSON parsing
       {:phoenix_pubsub, "~> 2.1"},     # Real-time updates and event broadcasting
       {:table_rex, "~> 4.0"},          # Pretty table formatting for CLI
-      {:progress_bar, "~> 3.0"}        # Progress indication for long-running tasks
+      {:progress_bar, "~> 3.0"},       # Progress indication for long-running tasks
+      {:excoveralls, "~> 0.18", only: :test}  # Code coverage reporting
     ]
   end
 end
