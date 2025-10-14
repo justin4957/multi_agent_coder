@@ -21,3 +21,14 @@ multi_agent_coder-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Escript executable
+multi_agent_coder
+
+# Environment files (if used)
+.env
+.env.*
+!.env.example
+
+# User configuration directory (contains API keys)
+# Note: This is stored in ~/.multi_agent_coder by default, not in the repo
