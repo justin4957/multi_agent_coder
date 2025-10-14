@@ -36,6 +36,22 @@ defmodule MultiAgentCoder.Agent.TokenCounterTest do
       assert cost > 0
     end
 
+    test "calculates Perplexity Sonar cost" do
+      cost = TokenCounter.calculate_cost(:perplexity, "sonar", 1000, 2000)
+      assert cost > 0
+      # Sonar: $1/1M input, $1/1M output
+      expected = 1000 * 1 / 1_000_000 + 2000 * 1 / 1_000_000
+      assert_in_delta cost, expected, 0.0001
+    end
+
+    test "calculates Perplexity Sonar Pro cost" do
+      cost = TokenCounter.calculate_cost(:perplexity, "sonar-pro", 1000, 2000)
+      assert cost > 0
+      # Sonar Pro: $3/1M input, $15/1M output
+      expected = 1000 * 3 / 1_000_000 + 2000 * 15 / 1_000_000
+      assert_in_delta cost, expected, 0.0001
+    end
+
     test "returns 0 for local models" do
       cost = TokenCounter.calculate_cost(:local, "llama2", 1000, 2000)
       assert cost == 0.0

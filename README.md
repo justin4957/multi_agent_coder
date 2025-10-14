@@ -4,7 +4,7 @@
 
 > Concurrent multi-provider command-line interface for AI-powered coding
 
-MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI providers (OpenAI, Anthropic, DeepSeek, Local LLMs) working **concurrently** on coding tasks. Allocate different parts of your project to different providers, monitor their progress in real-time, merge their code intelligently, and watch as multiple AI agents build your software simultaneously. Built with Elixir's robust concurrency model for true parallelism, fault tolerance, and real-time monitoring.
+MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI providers (OpenAI, Anthropic, DeepSeek, Perplexity AI, Local LLMs) working **concurrently** on coding tasks. Allocate different parts of your project to different providers, monitor their progress in real-time, merge their code intelligently, and watch as multiple AI agents build your software simultaneously. Built with Elixir's robust concurrency model for true parallelism, fault tolerance, and real-time monitoring.
 
 ## Features
 
@@ -27,7 +27,8 @@ MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI provide
 - **Automated Feedback Loop**: Send test results back to providers for iterative improvement
 
 ### Provider Integration
-- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek (DeepSeek Coder), Local LLMs (via Ollama)
+- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek (DeepSeek Coder), Perplexity AI (with web search), Local LLMs (via Ollama)
+- **Web Search**: Perplexity AI provides real-time web search capabilities with source citations
 - **Tool Use**: Providers can execute bash commands, run tests, install dependencies
 - **Safety Controls**: Command approval workflows for dangerous operations
 - **Fault Tolerance**: Supervision trees ensure if one provider fails, others continue
@@ -188,6 +189,7 @@ The setup wizard will:
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
 export DEEPSEEK_API_KEY="your-deepseek-key"
+export PERPLEXITY_API_KEY="your-perplexity-key"
 ```
 
 The CLI will detect these automatically and use them on first run.
@@ -592,6 +594,12 @@ config :multi_agent_coder,
       temperature: 0.1,
       max_tokens: 4096
     ],
+    perplexity: [
+      model: "sonar",                    # or "sonar-pro", "codellama", "mixtral"
+      api_key: {:system, "PERPLEXITY_API_KEY"},
+      temperature: 0.1,
+      max_tokens: 4096
+    ],
     local: [
       model: "codellama:latest",
       endpoint: "http://localhost:11434",
@@ -797,7 +805,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Built with [Elixir](https://elixir-lang.org/) and the BEAM VM
 - Uses [Phoenix.PubSub](https://hexdocs.pm/phoenix_pubsub/) for real-time updates
-- Integrates with leading AI providers: OpenAI, Anthropic, DeepSeek, and Ollama
+- Integrates with leading AI providers: OpenAI, Anthropic, DeepSeek, Perplexity AI, and Ollama
 
 ---
 

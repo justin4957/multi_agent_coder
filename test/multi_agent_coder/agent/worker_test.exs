@@ -19,7 +19,7 @@ defmodule MultiAgentCoder.Agent.WorkerTest do
         max_tokens: 2048
       ]
 
-      {:ok, pid} = start_supervised({Worker, opts})
+      {:ok, _pid} = start_supervised({Worker, opts})
 
       status = Worker.get_status(:test_provider)
 

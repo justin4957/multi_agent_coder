@@ -41,6 +41,15 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
       optional: true
     },
     %{
+      name: :perplexity,
+      display_name: "Perplexity AI",
+      key_env: "PERPLEXITY_API_KEY",
+      key_prompt: "Perplexity API Key",
+      models: ["sonar", "sonar-pro", "codellama", "mixtral"],
+      default_model: "sonar",
+      optional: true
+    },
+    %{
       name: :local,
       display_name: "Local LLM (Ollama)",
       key_env: nil,
