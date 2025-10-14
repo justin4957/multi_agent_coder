@@ -32,3 +32,6 @@ multi_agent_coder-*.tar
 
 # User configuration directory (contains API keys)
 # Note: This is stored in ~/.multi_agent_coder by default, not in the repo
+
+# Dialyzer PLT files
+/priv/plts/
