@@ -129,7 +129,7 @@ jobs:
         run: test -f multi_agent_coder
 
       - name: Upload escript artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: multi_agent_coder-escript
           path: multi_agent_coder

@@ -87,7 +87,7 @@ defmodule MultiAgentCoder.Agent.HTTPClient do
         Process.sleep(delay)
         do_request_with_retry(url, req_opts, retry_opts, attempt + 1)
 
-      {:ok, %{status: status} = response} when status in 500..599 and attempt < max_retries ->
+      {:ok, %{status: status}} when status in 500..599 and attempt < max_retries ->
         # Server error - retry with backoff
         delay = calculate_delay(retry_opts, attempt)
         Logger.warning("Server error (#{status}), retrying in #{delay}ms (attempt #{attempt + 1}/#{max_retries})")
@@ -116,7 +116,7 @@ defmodule MultiAgentCoder.Agent.HTTPClient do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         {:ok, body}
 
-      {:ok, %{status: status} = response} when status in [429, 500, 502, 503, 504] and attempt < max_retries ->
+      {:ok, %{status: status}} when status in [429, 500, 502, 503, 504] and attempt < max_retries ->
         delay = calculate_delay(retry_opts, attempt)
         Logger.warning("HTTP #{status}, retrying in #{delay}ms (attempt #{attempt + 1}/#{max_retries})")
         Process.sleep(delay)
@@ -125,7 +125,7 @@ defmodule MultiAgentCoder.Agent.HTTPClient do
       {:ok, %{status: status, body: body}} ->
         {:error, classify_http_error(status, body)}
 
-      {:error, reason} when attempt < max_retries ->
+      {:error, _reason} when attempt < max_retries ->
         delay = calculate_delay(retry_opts, attempt)
         Logger.warning("Request failed, retrying in #{delay}ms (attempt #{attempt + 1}/#{max_retries})")
         Process.sleep(delay)
