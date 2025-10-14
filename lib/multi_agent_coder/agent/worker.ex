@@ -29,7 +29,7 @@ defmodule MultiAgentCoder.Agent.Worker do
   Starts an agent worker process.
 
   ## Options
-    * `:provider` - The provider name (`:openai`, `:anthropic`, `:deepseek`, `:local`)
+    * `:provider` - The provider name (`:openai`, `:anthropic`, `:deepseek`, `:perplexity`, `:local`)
     * `:model` - The model to use
     * `:api_key` - API key (optional for local)
     * `:endpoint` - API endpoint (for local providers)
@@ -91,6 +91,7 @@ defmodule MultiAgentCoder.Agent.Worker do
         :openai -> MultiAgentCoder.Agent.OpenAI.call(state, prompt, context)
         :anthropic -> MultiAgentCoder.Agent.Anthropic.call(state, prompt, context)
         :deepseek -> MultiAgentCoder.Agent.DeepSeek.call(state, prompt, context)
+        :perplexity -> MultiAgentCoder.Agent.Perplexity.call(state, prompt, context)
         :local -> MultiAgentCoder.Agent.Local.call(state, prompt, context)
       end
 

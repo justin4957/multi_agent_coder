@@ -26,7 +26,7 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
   Calculates the cost of API usage based on token counts.
 
   ## Parameters
-    * `provider` - `:openai`, `:anthropic`, `:deepseek`, or `:local`
+    * `provider` - `:openai`, `:anthropic`, `:deepseek`, `:perplexity`, or `:local`
     * `model` - Model name
     * `input_tokens` - Number of input tokens
     * `output_tokens` - Number of output tokens
@@ -47,6 +47,11 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
 
   def calculate_cost(:deepseek, model, input_tokens, output_tokens) do
     {input_rate, output_rate} = get_deepseek_rates(model)
+    input_tokens * input_rate + output_tokens * output_rate
+  end
+
+  def calculate_cost(:perplexity, model, input_tokens, output_tokens) do
+    {input_rate, output_rate} = get_perplexity_rates(model)
     input_tokens * input_rate + output_tokens * output_rate
   end
 
@@ -148,5 +153,30 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
   defp get_deepseek_rates(_) do
     # Default to DeepSeek Coder pricing
     {0.14 / 1_000_000, 0.28 / 1_000_000}
+  end
+
+  defp get_perplexity_rates("sonar-pro" <> _) do
+    # Perplexity Sonar Pro: $3 per 1M input, $15 per 1M output
+    {3 / 1_000_000, 15 / 1_000_000}
+  end
+
+  defp get_perplexity_rates("sonar" <> _) do
+    # Perplexity Sonar: $1 per 1M input, $1 per 1M output
+    {1 / 1_000_000, 1 / 1_000_000}
+  end
+
+  defp get_perplexity_rates("codellama" <> _) do
+    # Perplexity CodeLlama: $1 per 1M input, $1 per 1M output
+    {1 / 1_000_000, 1 / 1_000_000}
+  end
+
+  defp get_perplexity_rates("mixtral" <> _) do
+    # Perplexity Mixtral: $0.6 per 1M input, $0.6 per 1M output
+    {0.6 / 1_000_000, 0.6 / 1_000_000}
+  end
+
+  defp get_perplexity_rates(_) do
+    # Default to Sonar pricing
+    {1 / 1_000_000, 1 / 1_000_000}
   end
 end

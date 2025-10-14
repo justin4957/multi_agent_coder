@@ -21,6 +21,12 @@ config :multi_agent_coder,
       temperature: 0.1,
       max_tokens: 4096
     ],
+    perplexity: [
+      model: "sonar",
+      api_key: {:system, "PERPLEXITY_API_KEY"},
+      temperature: 0.1,
+      max_tokens: 4096
+    ],
     local: [
       model: "codellama:latest",
       endpoint: "http://localhost:11434",
