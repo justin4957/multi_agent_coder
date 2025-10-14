@@ -38,25 +38,26 @@ MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI provide
 
 ## Quick Start
 
-Get started with concurrent multi-provider coding in under 5 minutes:
+Get started with concurrent multi-provider coding in **2 simple steps**:
 
 ```bash
-# 1. Clone and setup
+# 1. Clone and build
 git clone https://github.com/justin4957/multi_agent_coder.git
 cd multi_agent_coder
 mix deps.get
-
-# 2. Configure API keys
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
-export DEEPSEEK_API_KEY="your-deepseek-key"
-
-# 3. Build the CLI
 mix escript.build
 
-# 4. Start interactive mode
+# 2. Run the CLI (interactive setup on first run)
 ./multi_agent_coder -i
 ```
+
+The CLI will automatically prompt you for API keys on first run:
+- Checks for existing keys in environment variables
+- Interactively asks for missing keys
+- Saves configuration to `~/.multi_agent_coder/config.exs`
+- Validates and starts providers
+
+**That's it!** No manual configuration needed.
 
 ### Example: Concurrent Coding Session
 
@@ -155,37 +156,39 @@ Session saved ✓
 ### Prerequisites
 
 - Elixir 1.18+ and Erlang/OTP 26+
-- API keys for desired providers:
-  - `OPENAI_API_KEY` for OpenAI
-  - `ANTHROPIC_API_KEY` for Anthropic
-  - `DEEPSEEK_API_KEY` for DeepSeek
+- API keys for at least one provider (OpenAI or Anthropic recommended)
 - (Optional) [Ollama](https://ollama.ai/) for local LLM support
 
 ### Setup
 
-1. Clone the repository:
+1. Clone and build:
 ```bash
 git clone https://github.com/justin4957/multi_agent_coder.git
 cd multi_agent_coder
-```
-
-2. Install dependencies:
-```bash
 mix deps.get
-```
-
-3. Configure your API keys:
-```bash
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
-```
-
-4. Compile and build the CLI:
-```bash
 mix escript.build
 ```
 
-This creates an executable `multi_agent_coder` in the project root.
+2. Run and configure interactively:
+```bash
+./multi_agent_coder --setup
+```
+
+The setup wizard will:
+- Check for existing API keys in your environment variables
+- Prompt you for any missing keys
+- Let you select models for each provider
+- Save configuration to `~/.multi_agent_coder/config.exs`
+- Encrypt and secure your API keys (file permissions set to 0600)
+
+**Or** you can set environment variables (optional):
+```bash
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+export DEEPSEEK_API_KEY="your-deepseek-key"
+```
+
+The CLI will detect these automatically and use them on first run.
 
 ## Usage
 

@@ -6,14 +6,12 @@ defmodule MultiAgentCoder.CLI.Command do
   querying multiple AI agents concurrently.
   """
 
-  alias MultiAgentCoder.CLI.Formatter
+  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup}
   alias MultiAgentCoder.Router.TaskRouter
   alias MultiAgentCoder.Monitor.Realtime
 
   def main(args \\ []) do
-    # Ensure application is started
-    {:ok, _} = Application.ensure_all_started(:multi_agent_coder)
-
+    # Parse args first to check for setup command
     {opts, command_args, _} =
       OptionParser.parse(args,
         switches: [
@@ -22,7 +20,8 @@ defmodule MultiAgentCoder.CLI.Command do
           context: :string,
           output: :string,
           interactive: :boolean,
-          help: :boolean
+          help: :boolean,
+          setup: :boolean
         ],
         aliases: [
           s: :strategy,
@@ -34,6 +33,23 @@ defmodule MultiAgentCoder.CLI.Command do
         ]
       )
 
+    # Handle setup command separately
+    if opts[:setup] do
+      ConfigSetup.run_interactive_setup()
+      System.halt(0)
+    end
+
+    # Ensure configuration is set up before starting
+    ConfigSetup.ensure_configured!()
+
+    # Ensure application is started
+    {:ok, _} = Application.ensure_all_started(:multi_agent_coder)
+
+    # Continue with normal flow
+    execute_command(opts, command_args)
+  end
+
+  defp execute_command(opts, command_args) do
     cond do
       opts[:help] ->
         show_help()
@@ -80,6 +96,7 @@ defmodule MultiAgentCoder.CLI.Command do
     IO.puts("  ask <prompt>       - Query all agents")
     IO.puts("  compare <prompt>   - Compare agent responses")
     IO.puts("  dialectic <prompt> - Run dialectical workflow")
+    IO.puts("  config             - Reconfigure API keys and providers")
     IO.puts("  help               - Show this help")
     IO.puts("  exit               - Exit interactive mode")
     IO.puts("")
@@ -97,6 +114,11 @@ defmodule MultiAgentCoder.CLI.Command do
 
       {:help} ->
         show_interactive_help()
+        interactive_loop()
+
+      {:config} ->
+        ConfigSetup.run_interactive_setup()
+        IO.puts("\n⚠️  Please restart the CLI for new configuration to take effect.")
         interactive_loop()
 
       {:ask, task} ->
@@ -122,6 +144,7 @@ defmodule MultiAgentCoder.CLI.Command do
 
   defp parse_interactive_command("exit"), do: {:exit}
   defp parse_interactive_command("help"), do: {:help}
+  defp parse_interactive_command("config"), do: {:config}
 
   defp parse_interactive_command("ask " <> task), do: {:ask, task}
   defp parse_interactive_command("compare " <> task), do: {:compare, task}
@@ -138,13 +161,17 @@ defmodule MultiAgentCoder.CLI.Command do
 
     Options:
       -s, --strategy STRATEGY    Routing strategy (all, sequential, dialectical)
-      -p, --providers LIST       Comma-separated provider list (openai,anthropic,local)
+      -p, --providers LIST       Comma-separated provider list (openai,anthropic,deepseek,local)
       -c, --context JSON         Additional context as JSON
       -o, --output FILE          Save results to file
       -i, --interactive          Start interactive mode
+      --setup                    Run configuration setup (add/update API keys)
       -h, --help                 Show this help
 
     Examples:
+      # First time setup
+      multi_agent_coder --setup
+
       # Query all agents
       multi_agent_coder "Write a function to reverse a linked list"
 
@@ -165,6 +192,7 @@ defmodule MultiAgentCoder.CLI.Command do
       ask <prompt>       - Query all agents with a prompt
       compare <prompt>   - Compare responses from all agents
       dialectic <prompt> - Run thesis/antithesis/synthesis workflow
+      config             - Reconfigure API keys and providers
       help               - Show this help
       exit               - Exit interactive mode
     """)
