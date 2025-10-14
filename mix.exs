@@ -37,12 +37,18 @@ defmodule MultiAgentCoder.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:req, "~> 0.4"},                # HTTP client for API calls
-      {:jason, "~> 1.4"},              # JSON parsing
-      {:phoenix_pubsub, "~> 2.1"},     # Real-time updates and event broadcasting
-      {:table_rex, "~> 4.0"},          # Pretty table formatting for CLI
-      {:progress_bar, "~> 3.0"},       # Progress indication for long-running tasks
-      {:excoveralls, "~> 0.18", only: :test}  # Code coverage reporting
+      # HTTP client for API calls
+      {:req, "~> 0.4"},
+      # JSON parsing
+      {:jason, "~> 1.4"},
+      # Real-time updates and event broadcasting
+      {:phoenix_pubsub, "~> 2.1"},
+      # Pretty table formatting for CLI
+      {:table_rex, "~> 4.0"},
+      # Progress indication for long-running tasks
+      {:progress_bar, "~> 3.0"},
+      # Code coverage reporting
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 end

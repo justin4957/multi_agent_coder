@@ -15,10 +15,11 @@ defmodule MultiAgentCoder.Session.StorageTest do
 
   describe "session management" do
     test "creates a session with metadata" do
-      {:ok, session_id} = Storage.create_session(%{
-        tags: ["test", "feature"],
-        description: "Test session"
-      })
+      {:ok, session_id} =
+        Storage.create_session(%{
+          tags: ["test", "feature"],
+          description: "Test session"
+        })
 
       assert is_binary(session_id)
       assert String.starts_with?(session_id, "session_")
@@ -64,12 +65,13 @@ defmodule MultiAgentCoder.Session.StorageTest do
     test "adds a message to a session" do
       {:ok, session_id} = Storage.create_session(%{})
 
-      {:ok, message_id} = Storage.add_message(session_id, %{
-        role: :user,
-        content: "Test message",
-        provider: :openai,
-        tokens: 10
-      })
+      {:ok, message_id} =
+        Storage.add_message(session_id, %{
+          role: :user,
+          content: "Test message",
+          provider: :openai,
+          tokens: 10
+        })
 
       assert is_binary(message_id)
 
@@ -120,10 +122,11 @@ defmodule MultiAgentCoder.Session.StorageTest do
         tokens: 10
       })
 
-      {:ok, fork_id} = Storage.fork_session(parent_id,
-        at_message: 1,
-        metadata: %{fork_reason: "exploring alternative"}
-      )
+      {:ok, fork_id} =
+        Storage.fork_session(parent_id,
+          at_message: 1,
+          metadata: %{fork_reason: "exploring alternative"}
+        )
 
       {:ok, fork} = Storage.get_session(fork_id)
 

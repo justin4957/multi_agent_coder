@@ -9,22 +9,24 @@ defmodule MultiAgentCoder.Session.Storage.Message do
   defstruct [
     :id,
     :session_id,
-    :role,                   # :user, :assistant, :system
+    # :user, :assistant, :system
+    :role,
     :content,
-    :provider,               # Which AI provider generated this
+    # Which AI provider generated this
+    :provider,
     :timestamp,
     :tokens,
     :metadata
   ]
 
   @type t :: %__MODULE__{
-    id: String.t(),
-    session_id: String.t(),
-    role: atom(),
-    content: String.t(),
-    provider: atom() | nil,
-    timestamp: DateTime.t(),
-    tokens: non_neg_integer(),
-    metadata: map()
-  }
+          id: String.t(),
+          session_id: String.t(),
+          role: atom(),
+          content: String.t(),
+          provider: atom() | nil,
+          timestamp: DateTime.t(),
+          tokens: non_neg_integer(),
+          metadata: map()
+        }
 end

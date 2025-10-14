@@ -107,22 +107,24 @@ defmodule MultiAgentCoder.Monitor.Realtime do
       |> Enum.map(&{&1, :idle})
       |> Enum.into(%{})
 
-    new_state = %{state |
-      start_time: System.monotonic_time(:millisecond),
-      active_agents: MapSet.new(providers),
-      agent_statuses: agent_statuses,
-      agent_start_times: %{},
-      results: %{},
-      quiet_mode: quiet_mode
+    new_state = %{
+      state
+      | start_time: System.monotonic_time(:millisecond),
+        active_agents: MapSet.new(providers),
+        agent_statuses: agent_statuses,
+        agent_start_times: %{},
+        results: %{},
+        quiet_mode: quiet_mode
     }
 
     # Start display update loop
-    final_state = unless quiet_mode do
-      pid = spawn_link(fn -> display_loop(self()) end)
-      %{new_state | display_pid: pid}
-    else
-      new_state
-    end
+    final_state =
+      unless quiet_mode do
+        pid = spawn_link(fn -> display_loop(self()) end)
+        %{new_state | display_pid: pid}
+      else
+        new_state
+      end
 
     {:reply, :ok, final_state}
   end
@@ -152,6 +154,7 @@ defmodule MultiAgentCoder.Monitor.Realtime do
       elapsed_time: elapsed_time_ms(state.start_time),
       results_count: map_size(state.results)
     }
+
     {:reply, status, state}
   end
 
@@ -170,9 +173,10 @@ defmodule MultiAgentCoder.Monitor.Realtime do
         state.agent_start_times
       end
 
-    new_state = %{state |
-      agent_statuses: updated_statuses,
-      agent_start_times: updated_start_times
+    new_state = %{
+      state
+      | agent_statuses: updated_statuses,
+        agent_start_times: updated_start_times
     }
 
     unless state.quiet_mode do
@@ -189,10 +193,7 @@ defmodule MultiAgentCoder.Monitor.Realtime do
     updated_results = Map.put(state.results, provider, result)
     updated_statuses = Map.put(state.agent_statuses, provider, :completed)
 
-    new_state = %{state |
-      results: updated_results,
-      agent_statuses: updated_statuses
-    }
+    new_state = %{state | results: updated_results, agent_statuses: updated_statuses}
 
     unless state.quiet_mode do
       display_completion(provider, result, new_state)
@@ -251,10 +252,13 @@ defmodule MultiAgentCoder.Monitor.Realtime do
     case status do
       :working ->
         [color, spinner, " ", provider_name, " (", elapsed, ")", IO.ANSI.reset(), " "]
+
       :completed ->
         [color, icon, " ", provider_name, " ✓", IO.ANSI.reset(), " "]
+
       :error ->
         [color, icon, " ", provider_name, " ✗", IO.ANSI.reset(), " "]
+
       _ ->
         [color, icon, " ", provider_name, IO.ANSI.reset(), " "]
     end
@@ -269,7 +273,9 @@ defmodule MultiAgentCoder.Monitor.Realtime do
 
   defp get_agent_elapsed_time(provider, state) do
     case Map.get(state.agent_start_times, provider) do
-      nil -> "0s"
+      nil ->
+        "0s"
+
       start_time ->
         elapsed = System.monotonic_time(:millisecond) - start_time
         format_elapsed_time(elapsed)
@@ -301,6 +307,7 @@ defmodule MultiAgentCoder.Monitor.Realtime do
           "✓ #{provider_name} completed in #{elapsed}",
           IO.ANSI.reset()
         ])
+
       {:error, reason} ->
         Logger.error([
           IO.ANSI.red(),
@@ -329,6 +336,7 @@ defmodule MultiAgentCoder.Monitor.Realtime do
   end
 
   defp elapsed_time_ms(nil), do: 0
+
   defp elapsed_time_ms(start_time) do
     System.monotonic_time(:millisecond) - start_time
   end

@@ -81,6 +81,7 @@ defmodule MultiAgentCoder.Agent.ContextFormatterTest do
   describe "build_enhanced_prompt/2" do
     test "combines prompt with context" do
       prompt = "Write a function"
+
       context = %{
         files: [%{path: "lib/test.ex", content: "# existing code"}],
         previous_results: %{openai: {:ok, "Previous solution"}}

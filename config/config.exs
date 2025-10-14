@@ -31,8 +31,7 @@ config :multi_agent_coder,
   timeout: 120_000
 
 # Configure PubSub for real-time updates
-config :multi_agent_coder, MultiAgentCoder.PubSub,
-  adapter: Phoenix.PubSub.PG2
+config :multi_agent_coder, MultiAgentCoder.PubSub, adapter: Phoenix.PubSub.PG2
 
 # Import environment specific config
 import_config "#{config_env()}.exs"

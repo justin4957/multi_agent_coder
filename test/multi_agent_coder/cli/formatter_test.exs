@@ -38,9 +38,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         anthropic: {:ok, "Anthropic response"}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_standard_results(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_standard_results(results)
+        end)
 
       assert output =~ "OPENAI"
       assert output =~ "ANTHROPIC"
@@ -53,9 +54,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         openai: {:error, :connection_failed}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_standard_results(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_standard_results(results)
+        end)
 
       assert output =~ "OPENAI"
       assert output =~ "Error"
@@ -68,9 +70,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         anthropic: {:error, :timeout}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_standard_results(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_standard_results(results)
+        end)
 
       assert output =~ "Success"
       assert output =~ "timeout"
@@ -85,9 +88,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         synthesis: %{openai: {:ok, "Final solution"}}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_dialectical(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_dialectical(results)
+        end)
 
       assert output =~ "THESIS"
       assert output =~ "ANTITHESIS"
@@ -105,9 +109,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         anthropic: {:ok, "A much longer response with more content"}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_comparison(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_comparison(results)
+        end)
 
       assert output =~ "Provider"
       assert output =~ "Length"
@@ -122,9 +127,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         anthropic: {:error, :failed}
       }
 
-      output = capture_io(fn ->
-        Formatter.display_comparison(results)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_comparison(results)
+        end)
 
       assert output =~ "Error"
       assert output =~ "N/A"
@@ -141,7 +147,8 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
 
       assert output =~ "OPENAI"
       assert output =~ "File content"
-      refute output =~ "\e[" # Should not contain ANSI codes
+      # Should not contain ANSI codes
+      refute output =~ "\e["
     end
 
     test "formats dialectical results for file output" do
@@ -169,9 +176,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         failed: 0
       }
 
-      output = capture_io(fn ->
-        Formatter.display_statistics(stats)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_statistics(stats)
+        end)
 
       assert output =~ "EXECUTION SUMMARY"
       assert output =~ "Total Time"
@@ -189,9 +197,10 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
         failed: 1
       }
 
-      output = capture_io(fn ->
-        Formatter.display_statistics(stats)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_statistics(stats)
+        end)
 
       assert output =~ "Failed"
       assert output =~ "50.0%"
@@ -200,27 +209,30 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
 
   describe "display_agent_status/3" do
     test "displays working status" do
-      output = capture_io(fn ->
-        Formatter.display_agent_status(:openai, :working, 1500)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_agent_status(:openai, :working, 1500)
+        end)
 
       assert output =~ "Openai"
       assert output =~ "1.5s"
     end
 
     test "displays completed status" do
-      output = capture_io(fn ->
-        Formatter.display_agent_status(:anthropic, :completed, 3000)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_agent_status(:anthropic, :completed, 3000)
+        end)
 
       assert output =~ "Anthropic"
       assert output =~ "3.0s"
     end
 
     test "displays error status" do
-      output = capture_io(fn ->
-        Formatter.display_agent_status(:deepseek, :error)
-      end)
+      output =
+        capture_io(fn ->
+          Formatter.display_agent_status(:deepseek, :error)
+        end)
 
       assert output =~ "Deepseek"
     end
@@ -240,8 +252,8 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
 
     test "formats minutes" do
       assert Formatter.format_time_ms(60000) == "1m 0s"
-      assert Formatter.format_time_ms(125000) == "2m 5s"
-      assert Formatter.format_time_ms(180000) == "3m 0s"
+      assert Formatter.format_time_ms(125_000) == "2m 5s"
+      assert Formatter.format_time_ms(180_000) == "3m 0s"
     end
   end
 end

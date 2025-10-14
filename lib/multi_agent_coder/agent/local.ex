@@ -213,7 +213,9 @@ defmodule MultiAgentCoder.Agent.Local do
     end
   end
 
-  defp classify_error({:network_error, _reason}), do: {:server_unreachable, "Cannot connect to Ollama server"}
+  defp classify_error({:network_error, _reason}),
+    do: {:server_unreachable, "Cannot connect to Ollama server"}
+
   defp classify_error({:server_unreachable, msg}), do: {:server_unreachable, msg}
   defp classify_error({:bad_request, msg}), do: {:invalid_request, msg}
   defp classify_error({:not_found, _}), do: {:model_not_found, "Model not found on Ollama server"}

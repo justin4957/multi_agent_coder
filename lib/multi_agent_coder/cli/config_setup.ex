@@ -84,13 +84,20 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     IO.puts("Configuration will be saved to: #{@config_file}\n")
 
     # Check for existing environment variables first
-    IO.puts(IO.ANSI.yellow() <> "Checking for existing API keys in environment variables..." <> IO.ANSI.reset())
+    IO.puts(
+      IO.ANSI.yellow() <>
+        "Checking for existing API keys in environment variables..." <> IO.ANSI.reset()
+    )
 
     provider_configs = Enum.map(@providers, &configure_provider/1)
     enabled_providers = Enum.filter(provider_configs, & &1)
 
     if Enum.empty?(enabled_providers) do
-      IO.puts(IO.ANSI.red() <> "\n⚠️  No providers configured! At least one provider is required." <> IO.ANSI.reset())
+      IO.puts(
+        IO.ANSI.red() <>
+          "\n⚠️  No providers configured! At least one provider is required." <> IO.ANSI.reset()
+      )
+
       IO.puts("Please configure at least OpenAI or Anthropic to continue.\n")
       run_interactive_setup()
     else
@@ -98,6 +105,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
       IO.puts(IO.ANSI.green() <> "\n✅ Configuration saved successfully!" <> IO.ANSI.reset())
       IO.puts("\nConfigured providers:")
+
       Enum.each(enabled_providers, fn config ->
         IO.puts("  • #{config.display_name} (#{config.model})")
       end)
@@ -108,7 +116,9 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     end
   end
 
-  defp configure_provider(%{name: name, display_name: display_name, optional: optional} = provider) do
+  defp configure_provider(
+         %{name: name, display_name: display_name, optional: optional} = provider
+       ) do
     IO.puts(IO.ANSI.cyan() <> "\n─────────────────────────────────────────" <> IO.ANSI.reset())
     IO.puts(IO.ANSI.bright() <> "Configure #{display_name}" <> IO.ANSI.reset())
 
@@ -119,20 +129,26 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     # Check for existing API key in environment
     existing_key = if provider.key_env, do: System.get_env(provider.key_env)
 
-    api_key = if existing_key do
-      masked_key = mask_api_key(existing_key)
-      IO.puts(IO.ANSI.green() <> "✓ Found existing #{provider.key_prompt}: #{masked_key}" <> IO.ANSI.reset())
-      IO.write("Use this key? (Y/n): ")
+    api_key =
+      if existing_key do
+        masked_key = mask_api_key(existing_key)
 
-      case IO.gets("") |> String.trim() |> String.downcase() do
-        "" -> existing_key
-        "y" -> existing_key
-        "yes" -> existing_key
-        _ -> prompt_for_api_key(provider, optional)
+        IO.puts(
+          IO.ANSI.green() <>
+            "✓ Found existing #{provider.key_prompt}: #{masked_key}" <> IO.ANSI.reset()
+        )
+
+        IO.write("Use this key? (Y/n): ")
+
+        case IO.gets("") |> String.trim() |> String.downcase() do
+          "" -> existing_key
+          "y" -> existing_key
+          "yes" -> existing_key
+          _ -> prompt_for_api_key(provider, optional)
+        end
+      else
+        prompt_for_api_key(provider, optional)
       end
-    else
-      prompt_for_api_key(provider, optional)
-    end
 
     if api_key && api_key != "" do
       model = prompt_for_model(provider)
@@ -159,6 +175,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
   defp prompt_for_api_key(%{key_prompt: prompt, name: :local}, _optional) do
     IO.write("#{prompt} (default: http://localhost:11434): ")
+
     case IO.gets("") |> String.trim() do
       "" -> nil
       endpoint -> endpoint
@@ -170,16 +187,21 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     input = IO.gets("") |> String.trim()
 
     cond do
-      input == "" && optional -> nil
+      input == "" && optional ->
+        nil
+
       input == "" ->
         IO.puts(IO.ANSI.red() <> "API key is required for this provider." <> IO.ANSI.reset())
         prompt_for_api_key(%{key_prompt: prompt}, optional)
-      true -> input
+
+      true ->
+        input
     end
   end
 
   defp prompt_for_model(%{models: models, default_model: default}) do
     IO.puts("\nAvailable models:")
+
     Enum.with_index(models, 1)
     |> Enum.each(fn {model, idx} ->
       default_marker = if model == default, do: " (default)", else: ""
@@ -191,12 +213,18 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     case IO.gets("") |> String.trim() do
       "" ->
         default
+
       input ->
         case Integer.parse(input) do
           {num, _} when num >= 1 and num <= length(models) ->
             Enum.at(models, num - 1)
+
           _ ->
-            IO.puts(IO.ANSI.yellow() <> "Invalid selection, using default: #{default}" <> IO.ANSI.reset())
+            IO.puts(
+              IO.ANSI.yellow() <>
+                "Invalid selection, using default: #{default}" <> IO.ANSI.reset()
+            )
+
             default
         end
     end
@@ -204,6 +232,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
 
   defp prompt_for_endpoint do
     IO.write("Ollama endpoint (default: http://localhost:11434): ")
+
     case IO.gets("") |> String.trim() do
       "" -> "http://localhost:11434"
       endpoint -> endpoint
@@ -215,6 +244,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
     suffix = String.slice(key, -4, 4)
     "#{prefix}...#{suffix}"
   end
+
   defp mask_api_key(key), do: "#{String.slice(key, 0, 2)}..."
 
   defp save_config(provider_configs) do
@@ -315,19 +345,26 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
         existing_providers = multi_agent_config[:providers]
 
         # Update provider
-        updated_providers = Keyword.put(existing_providers, provider_name, [
-          model: new_config.model,
-          api_key: new_config.api_key,
-          temperature: 0.1,
-          max_tokens: 4096
-        ])
+        updated_providers =
+          Keyword.put(existing_providers, provider_name,
+            model: new_config.model,
+            api_key: new_config.api_key,
+            temperature: 0.1,
+            max_tokens: 4096
+          )
 
         # Save updated config
-        save_config(Enum.map(updated_providers, fn {name, config} ->
-          Map.merge(%{name: name}, Enum.into(config, %{}))
-        end))
+        save_config(
+          Enum.map(updated_providers, fn {name, config} ->
+            Map.merge(%{name: name}, Enum.into(config, %{}))
+          end)
+        )
 
-        IO.puts(IO.ANSI.green() <> "✅ #{provider.display_name} reconfigured successfully!" <> IO.ANSI.reset())
+        IO.puts(
+          IO.ANSI.green() <>
+            "✅ #{provider.display_name} reconfigured successfully!" <> IO.ANSI.reset()
+        )
+
         :ok
       else
         IO.puts(IO.ANSI.yellow() <> "Configuration cancelled." <> IO.ANSI.reset())
