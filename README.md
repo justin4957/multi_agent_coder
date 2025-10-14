@@ -25,7 +25,7 @@ MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI provide
 - **Automated Feedback Loop**: Send test results back to providers for iterative improvement
 
 ### Provider Integration
-- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), Local LLMs (via Ollama)
+- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek (DeepSeek Coder), Local LLMs (via Ollama)
 - **Tool Use**: Providers can execute bash commands, run tests, install dependencies
 - **Safety Controls**: Command approval workflows for dangerous operations
 - **Fault Tolerance**: Supervision trees ensure if one provider fails, others continue
@@ -49,6 +49,7 @@ mix deps.get
 # 2. Configure API keys
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
+export DEEPSEEK_API_KEY="your-deepseek-key"
 
 # 3. Build the CLI
 mix escript.build
@@ -157,6 +158,7 @@ Session saved ✓
 - API keys for desired providers:
   - `OPENAI_API_KEY` for OpenAI
   - `ANTHROPIC_API_KEY` for Anthropic
+  - `DEEPSEEK_API_KEY` for DeepSeek
 - (Optional) [Ollama](https://ollama.ai/) for local LLM support
 
 ### Setup
@@ -431,6 +433,12 @@ config :multi_agent_coder,
       temperature: 0.1,
       max_tokens: 4096
     ],
+    deepseek: [
+      model: "deepseek-coder",           # or "deepseek-chat"
+      api_key: {:system, "DEEPSEEK_API_KEY"},
+      temperature: 0.1,
+      max_tokens: 4096
+    ],
     local: [
       model: "codellama:latest",
       endpoint: "http://localhost:11434",
@@ -636,7 +644,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Built with [Elixir](https://elixir-lang.org/) and the BEAM VM
 - Uses [Phoenix.PubSub](https://hexdocs.pm/phoenix_pubsub/) for real-time updates
-- Integrates with leading AI providers: OpenAI, Anthropic, and Ollama
+- Integrates with leading AI providers: OpenAI, Anthropic, DeepSeek, and Ollama
 
 ---
 
