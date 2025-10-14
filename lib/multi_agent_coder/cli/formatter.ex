@@ -222,4 +222,158 @@ defmodule MultiAgentCoder.CLI.Formatter do
 
   defp format_result_content({:ok, content}), do: content
   defp format_result_content({:error, reason}), do: "Error: #{inspect(reason)}"
+
+  @doc """
+  Displays execution statistics summary.
+  """
+  def display_statistics(stats) do
+    IO.puts([
+      "\n",
+      IO.ANSI.cyan(),
+      IO.ANSI.bright(),
+      "═══════════════════════════════════════════════════════════════",
+      IO.ANSI.reset(),
+      "\n"
+    ])
+
+    IO.puts([
+      IO.ANSI.bright(),
+      "  EXECUTION SUMMARY",
+      IO.ANSI.reset()
+    ])
+
+    IO.puts([
+      IO.ANSI.cyan(),
+      "═══════════════════════════════════════════════════════════════",
+      IO.ANSI.reset(),
+      "\n"
+    ])
+
+    # Total time
+    IO.puts([
+      "  Total Time:      ",
+      IO.ANSI.bright(),
+      format_time_ms(stats.total_time_ms),
+      IO.ANSI.reset()
+    ])
+
+    # Agent count
+    IO.puts([
+      "  Total Agents:    ",
+      IO.ANSI.bright(),
+      "#{stats.total_agents}",
+      IO.ANSI.reset()
+    ])
+
+    # Success rate
+    success_rate = if stats.total_agents > 0 do
+      Float.round(stats.successful / stats.total_agents * 100, 1)
+    else
+      0.0
+    end
+
+    success_color = if success_rate == 100.0, do: IO.ANSI.green(), else: IO.ANSI.yellow()
+
+    IO.puts([
+      "  Successful:      ",
+      success_color,
+      IO.ANSI.bright(),
+      "#{stats.successful} (#{success_rate}%)",
+      IO.ANSI.reset()
+    ])
+
+    if stats.failed > 0 do
+      IO.puts([
+        "  Failed:          ",
+        IO.ANSI.red(),
+        IO.ANSI.bright(),
+        "#{stats.failed}",
+        IO.ANSI.reset()
+      ])
+    end
+
+    IO.puts([
+      "\n",
+      IO.ANSI.cyan(),
+      "═══════════════════════════════════════════════════════════════",
+      IO.ANSI.reset(),
+      "\n"
+    ])
+  end
+
+  @doc """
+  Displays a progress bar.
+  """
+  def display_progress_bar(current, total, opts \\ []) do
+    width = Keyword.get(opts, :width, 50)
+    label = Keyword.get(opts, :label, "Progress")
+
+    percentage = if total > 0, do: current / total, else: 0
+    filled_width = round(width * percentage)
+    empty_width = width - filled_width
+
+    bar = [
+      IO.ANSI.green(),
+      String.duplicate("█", filled_width),
+      IO.ANSI.blue(),
+      String.duplicate("░", empty_width),
+      IO.ANSI.reset()
+    ]
+
+    percent_display = :erlang.float_to_binary(percentage * 100, decimals: 1)
+
+    IO.write([
+      "\r",
+      label,
+      ": [",
+      bar,
+      "] ",
+      percent_display,
+      "%"
+    ])
+  end
+
+  @doc """
+  Displays agent status with color indicators.
+  """
+  def display_agent_status(provider, status, elapsed_time \\ nil) do
+    provider_name = provider |> to_string() |> String.capitalize()
+
+    {icon, color} = get_status_display(status)
+
+    time_str = if elapsed_time do
+      " (#{format_time_ms(elapsed_time)})"
+    else
+      ""
+    end
+
+    IO.puts([
+      color,
+      icon,
+      " ",
+      provider_name,
+      time_str,
+      IO.ANSI.reset()
+    ])
+  end
+
+  @doc """
+  Formats milliseconds into human-readable time.
+  """
+  def format_time_ms(ms) when ms < 1000, do: "#{ms}ms"
+  def format_time_ms(ms) when ms < 60_000 do
+    seconds = Float.round(ms / 1000, 1)
+    "#{seconds}s"
+  end
+  def format_time_ms(ms) do
+    minutes = div(ms, 60_000)
+    seconds = div(rem(ms, 60_000), 1000)
+    "#{minutes}m #{seconds}s"
+  end
+
+  defp get_status_display(:working), do: {"⚙", IO.ANSI.yellow()}
+  defp get_status_display(:completed), do: {"✓", IO.ANSI.green()}
+  defp get_status_display(:error), do: {"✗", IO.ANSI.red()}
+  defp get_status_display(:idle), do: {"○", IO.ANSI.blue()}
+  defp get_status_display(_), do: {"?", IO.ANSI.white()}
 end
