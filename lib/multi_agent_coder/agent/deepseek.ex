@@ -42,7 +42,10 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
     with {:ok, messages} <- build_messages(prompt, context),
          {:ok, body} <- make_request(state, messages),
          {:ok, response, usage} <- extract_response(body, state, prompt) do
-      Logger.info("DeepSeek: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}")
+      Logger.info(
+        "DeepSeek: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}"
+      )
+
       {:ok, response, usage}
     else
       {:error, reason} = error ->
@@ -80,7 +83,9 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
       max_tokens: 10
     }
 
-    case HTTPClient.post_with_retry("#{@api_base}/chat/completions", body, headers, timeout: 30_000) do
+    case HTTPClient.post_with_retry("#{@api_base}/chat/completions", body, headers,
+           timeout: 30_000
+         ) do
       {:ok, _response} -> :ok
       {:error, {:unauthorized, _}} -> {:error, :invalid_api_key}
       {:error, reason} -> {:error, reason}

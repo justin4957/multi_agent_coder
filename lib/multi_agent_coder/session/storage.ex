@@ -18,10 +18,14 @@ defmodule MultiAgentCoder.Session.Storage do
   alias MultiAgentCoder.Session.Storage.{Session, Message}
 
   defstruct [
-    :sessions_table,          # Main session storage
-    :session_index_table,     # Tag and metadata indexing
-    :session_forks_table,     # Session forking relationships
-    :access_tracker_table,    # Access pattern tracking
+    # Main session storage
+    :sessions_table,
+    # Tag and metadata indexing
+    :session_index_table,
+    # Session forking relationships
+    :session_forks_table,
+    # Access pattern tracking
+    :access_tracker_table,
     :session_id_counter,
     :message_id_counter,
     :storage_dir
@@ -64,6 +68,7 @@ defmodule MultiAgentCoder.Session.Storage do
         # Track access
         track_access(session_id)
         {:ok, session}
+
       [] ->
         # Try loading from disk
         load_session_from_disk(session_id)
@@ -88,9 +93,10 @@ defmodule MultiAgentCoder.Session.Storage do
   Lists all active sessions.
   """
   def list_sessions do
-    sessions = :ets.tab2list(@sessions_table)
-    |> Enum.map(fn {_id, session} -> session end)
-    |> Enum.sort_by(& &1.last_accessed_at, {:desc, DateTime})
+    sessions =
+      :ets.tab2list(@sessions_table)
+      |> Enum.map(fn {_id, session} -> session end)
+      |> Enum.sort_by(& &1.last_accessed_at, {:desc, DateTime})
 
     {:ok, sessions}
   end
@@ -102,13 +108,15 @@ defmodule MultiAgentCoder.Session.Storage do
     case :ets.lookup(@session_index_table, {:tag, tag}) do
       objects ->
         session_ids = Enum.map(objects, fn {{:tag, _tag}, session_id} -> session_id end)
-        sessions = Enum.map(session_ids, fn id ->
-          case get_session(id) do
-            {:ok, session} -> session
-            _ -> nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
+
+        sessions =
+          Enum.map(session_ids, fn id ->
+            case get_session(id) do
+              {:ok, session} -> session
+              _ -> nil
+            end
+          end)
+          |> Enum.reject(&is_nil/1)
 
         {:ok, sessions}
     end
@@ -120,10 +128,11 @@ defmodule MultiAgentCoder.Session.Storage do
   def find_sessions_by_date_range(start_date, end_date) do
     {:ok, sessions} = list_sessions()
 
-    filtered = Enum.filter(sessions, fn session ->
-      DateTime.compare(session.created_at, start_date) in [:gt, :eq] and
-        DateTime.compare(session.created_at, end_date) in [:lt, :eq]
-    end)
+    filtered =
+      Enum.filter(sessions, fn session ->
+        DateTime.compare(session.created_at, start_date) in [:gt, :eq] and
+          DateTime.compare(session.created_at, end_date) in [:lt, :eq]
+      end)
 
     {:ok, filtered}
   end
@@ -205,10 +214,22 @@ defmodule MultiAgentCoder.Session.Storage do
     File.mkdir_p!(storage_dir)
 
     # Create ETS tables
-    sessions_table = create_table(@sessions_table, [:set, :named_table, :public, {:read_concurrency, true}])
-    session_index_table = create_table(@session_index_table, [:bag, :named_table, :public, {:read_concurrency, true}])
-    session_forks_table = create_table(@session_forks_table, [:bag, :named_table, :public, {:read_concurrency, true}])
-    access_tracker_table = create_table(@access_tracker_table, [:set, :named_table, :public, {:write_concurrency, true}])
+    sessions_table =
+      create_table(@sessions_table, [:set, :named_table, :public, {:read_concurrency, true}])
+
+    session_index_table =
+      create_table(@session_index_table, [:bag, :named_table, :public, {:read_concurrency, true}])
+
+    session_forks_table =
+      create_table(@session_forks_table, [:bag, :named_table, :public, {:read_concurrency, true}])
+
+    access_tracker_table =
+      create_table(@access_tracker_table, [
+        :set,
+        :named_table,
+        :public,
+        {:write_concurrency, true}
+      ])
 
     state = %__MODULE__{
       sessions_table: sessions_table,
@@ -249,12 +270,16 @@ defmodule MultiAgentCoder.Session.Storage do
 
     # Index tags
     tags = Map.get(metadata, :tags, [])
+
     Enum.each(tags, fn tag ->
       :ets.insert(state.session_index_table, {{:tag, tag}, session_id})
     end)
 
     # Initialize access tracking
-    :ets.insert(state.access_tracker_table, {session_id, %{access_count: 0, last_access: DateTime.utc_now()}})
+    :ets.insert(
+      state.access_tracker_table,
+      {session_id, %{access_count: 0, last_access: DateTime.utc_now()}}
+    )
 
     new_state = %{state | session_id_counter: state.session_id_counter + 1}
 
@@ -296,6 +321,7 @@ defmodule MultiAgentCoder.Session.Storage do
 
         # Index tags
         tags = Map.get(fork_session.metadata, :tags, [])
+
         Enum.each(tags, fn tag ->
           :ets.insert(state.session_index_table, {{:tag, tag}, fork_id})
         end)
@@ -339,11 +365,12 @@ defmodule MultiAgentCoder.Session.Storage do
           metadata: Map.get(message_params, :metadata, %{})
         }
 
-        updated_session = %{session |
-          messages: session.messages ++ [message],
-          last_accessed_at: DateTime.utc_now(),
-          total_tokens: session.total_tokens + message.tokens,
-          providers_used: Enum.uniq(session.providers_used ++ [message.provider])
+        updated_session = %{
+          session
+          | messages: session.messages ++ [message],
+            last_accessed_at: DateTime.utc_now(),
+            total_tokens: session.total_tokens + message.tokens,
+            providers_used: Enum.uniq(session.providers_used ++ [message.provider])
         }
 
         :ets.insert(state.sessions_table, {session_id, updated_session})
@@ -434,6 +461,7 @@ defmodule MultiAgentCoder.Session.Storage do
 
             # Re-index tags
             tags = Map.get(session.metadata, :tags, [])
+
             Enum.each(tags, fn tag ->
               :ets.insert(state.session_index_table, {{:tag, tag}, new_id})
             end)
@@ -458,6 +486,7 @@ defmodule MultiAgentCoder.Session.Storage do
     # Optionally delete forks
     if delete_forks do
       {:ok, fork_ids} = get_session_forks(session_id)
+
       Enum.each(fork_ids, fn fork_id ->
         delete_session_internal(fork_id, state)
       end)
@@ -497,10 +526,14 @@ defmodule MultiAgentCoder.Session.Storage do
           access_count: tracker.access_count + 1,
           last_access: DateTime.utc_now()
         }
+
         :ets.insert(@access_tracker_table, {session_id, updated_tracker})
 
       [] ->
-        :ets.insert(@access_tracker_table, {session_id, %{access_count: 1, last_access: DateTime.utc_now()}})
+        :ets.insert(
+          @access_tracker_table,
+          {session_id, %{access_count: 1, last_access: DateTime.utc_now()}}
+        )
     end
   end
 
@@ -512,12 +545,14 @@ defmodule MultiAgentCoder.Session.Storage do
 
         # Remove from indexes
         tags = Map.get(session.metadata, :tags, [])
+
         Enum.each(tags, fn tag ->
           :ets.delete_object(state.session_index_table, {{:tag, tag}, session_id})
         end)
 
         # Remove fork relationships
         :ets.delete_object(state.session_forks_table, {{:child, session_id}, session.parent_id})
+
         case :ets.lookup(state.session_forks_table, {:parent, session_id}) do
           objects ->
             Enum.each(objects, fn obj -> :ets.delete_object(state.session_forks_table, obj) end)
@@ -539,14 +574,16 @@ defmodule MultiAgentCoder.Session.Storage do
 
   defp deserialize_session(session_data) do
     # Convert datetime strings to DateTime structs
-    session_data = session_data
-    |> Map.update(:created_at, nil, &parse_datetime/1)
-    |> Map.update(:last_accessed_at, nil, &parse_datetime/1)
+    session_data =
+      session_data
+      |> Map.update(:created_at, nil, &parse_datetime/1)
+      |> Map.update(:last_accessed_at, nil, &parse_datetime/1)
 
     # Convert messages
-    messages = session_data
-    |> Map.get(:messages, [])
-    |> Enum.map(&deserialize_message/1)
+    messages =
+      session_data
+      |> Map.get(:messages, [])
+      |> Enum.map(&deserialize_message/1)
 
     session_data = Map.put(session_data, :messages, messages)
 
@@ -560,6 +597,7 @@ defmodule MultiAgentCoder.Session.Storage do
 
   defp parse_datetime(nil), do: nil
   defp parse_datetime(%DateTime{} = dt), do: dt
+
   defp parse_datetime(string) when is_binary(string) do
     case DateTime.from_iso8601(string) do
       {:ok, datetime, _offset} -> datetime

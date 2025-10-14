@@ -89,11 +89,25 @@ defmodule MultiAgentCoder.CLI.Formatter do
     display_standard_results(results.thesis)
 
     # Antithesis
-    IO.puts(["\n", IO.ANSI.yellow(), IO.ANSI.bright(), "PHASE 2: ANTITHESIS (Critiques)", IO.ANSI.reset()])
+    IO.puts([
+      "\n",
+      IO.ANSI.yellow(),
+      IO.ANSI.bright(),
+      "PHASE 2: ANTITHESIS (Critiques)",
+      IO.ANSI.reset()
+    ])
+
     display_standard_results(results.antithesis)
 
     # Synthesis
-    IO.puts(["\n", IO.ANSI.magenta(), IO.ANSI.bright(), "PHASE 3: SYNTHESIS (Final Solution)", IO.ANSI.reset()])
+    IO.puts([
+      "\n",
+      IO.ANSI.magenta(),
+      IO.ANSI.bright(),
+      "PHASE 3: SYNTHESIS (Final Solution)",
+      IO.ANSI.reset()
+    ])
+
     display_standard_results(results.synthesis)
   end
 
@@ -266,11 +280,12 @@ defmodule MultiAgentCoder.CLI.Formatter do
     ])
 
     # Success rate
-    success_rate = if stats.total_agents > 0 do
-      Float.round(stats.successful / stats.total_agents * 100, 1)
-    else
-      0.0
-    end
+    success_rate =
+      if stats.total_agents > 0 do
+        Float.round(stats.successful / stats.total_agents * 100, 1)
+      else
+        0.0
+      end
 
     success_color = if success_rate == 100.0, do: IO.ANSI.green(), else: IO.ANSI.yellow()
 
@@ -341,11 +356,12 @@ defmodule MultiAgentCoder.CLI.Formatter do
 
     {icon, color} = get_status_display(status)
 
-    time_str = if elapsed_time do
-      " (#{format_time_ms(elapsed_time)})"
-    else
-      ""
-    end
+    time_str =
+      if elapsed_time do
+        " (#{format_time_ms(elapsed_time)})"
+      else
+        ""
+      end
 
     IO.puts([
       color,
@@ -361,10 +377,12 @@ defmodule MultiAgentCoder.CLI.Formatter do
   Formats milliseconds into human-readable time.
   """
   def format_time_ms(ms) when ms < 1000, do: "#{ms}ms"
+
   def format_time_ms(ms) when ms < 60_000 do
     seconds = Float.round(ms / 1000, 1)
     "#{seconds}s"
   end
+
   def format_time_ms(ms) do
     minutes = div(ms, 60_000)
     seconds = div(rem(ms, 60_000), 1000)

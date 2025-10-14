@@ -40,7 +40,10 @@ defmodule MultiAgentCoder.Agent.Anthropic do
     with {:ok, system_prompt, messages} <- build_messages(prompt, context),
          {:ok, body} <- make_request(state, system_prompt, messages),
          {:ok, response, usage} <- extract_response(body, state, prompt) do
-      Logger.info("Anthropic: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}")
+      Logger.info(
+        "Anthropic: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}"
+      )
+
       {:ok, response, usage}
     else
       {:error, reason} = error ->

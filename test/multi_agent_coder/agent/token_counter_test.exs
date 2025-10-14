@@ -27,7 +27,7 @@ defmodule MultiAgentCoder.Agent.TokenCounterTest do
       cost = TokenCounter.calculate_cost(:openai, "gpt-4", 1000, 2000)
       assert cost > 0
       # GPT-4: $0.03/1K input, $0.06/1K output
-      expected = (1000 * 0.03 / 1000) + (2000 * 0.06 / 1000)
+      expected = 1000 * 0.03 / 1000 + 2000 * 0.06 / 1000
       assert_in_delta cost, expected, 0.0001
     end
 

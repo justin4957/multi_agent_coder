@@ -9,31 +9,39 @@ defmodule MultiAgentCoder.Session.Storage.Session do
   @derive Jason.Encoder
   defstruct [
     :id,
-    :parent_id,              # For forked sessions
-    :fork_point,             # Message index where fork occurred
+    # For forked sessions
+    :parent_id,
+    # Message index where fork occurred
+    :fork_point,
     :created_at,
     :last_accessed_at,
     :access_count,
-    :messages,               # List of Message structs
-    :metadata,               # Tags, labels, custom data
-    :providers_used,         # List of AI providers used
-    :total_tokens,           # Total token usage
-    :estimated_cost,         # Estimated cost in USD
-    :retention_policy        # :standard, :critical, :temporary
+    # List of Message structs
+    :messages,
+    # Tags, labels, custom data
+    :metadata,
+    # List of AI providers used
+    :providers_used,
+    # Total token usage
+    :total_tokens,
+    # Estimated cost in USD
+    :estimated_cost,
+    # :standard, :critical, :temporary
+    :retention_policy
   ]
 
   @type t :: %__MODULE__{
-    id: String.t(),
-    parent_id: String.t() | nil,
-    fork_point: non_neg_integer() | nil,
-    created_at: DateTime.t(),
-    last_accessed_at: DateTime.t(),
-    access_count: non_neg_integer(),
-    messages: list(MultiAgentCoder.Session.Storage.Message.t()),
-    metadata: map(),
-    providers_used: list(atom()),
-    total_tokens: non_neg_integer(),
-    estimated_cost: float(),
-    retention_policy: atom()
-  }
+          id: String.t(),
+          parent_id: String.t() | nil,
+          fork_point: non_neg_integer() | nil,
+          created_at: DateTime.t(),
+          last_accessed_at: DateTime.t(),
+          access_count: non_neg_integer(),
+          messages: list(MultiAgentCoder.Session.Storage.Message.t()),
+          metadata: map(),
+          providers_used: list(atom()),
+          total_tokens: non_neg_integer(),
+          estimated_cost: float(),
+          retention_policy: atom()
+        }
 end

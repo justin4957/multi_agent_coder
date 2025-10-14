@@ -40,7 +40,10 @@ defmodule MultiAgentCoder.Agent.OpenAI do
     with {:ok, messages} <- build_messages(prompt, context),
          {:ok, body} <- make_request(state, messages),
          {:ok, response, usage} <- extract_response(body, state, prompt) do
-      Logger.info("OpenAI: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}")
+      Logger.info(
+        "OpenAI: Request successful - #{usage.total_tokens} tokens, #{usage.formatted_cost}"
+      )
+
       {:ok, response, usage}
     else
       {:error, reason} = error ->
