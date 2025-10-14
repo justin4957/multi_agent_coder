@@ -26,7 +26,7 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
   Calculates the cost of API usage based on token counts.
 
   ## Parameters
-    * `provider` - `:openai`, `:anthropic`, or `:local`
+    * `provider` - `:openai`, `:anthropic`, `:deepseek`, or `:local`
     * `model` - Model name
     * `input_tokens` - Number of input tokens
     * `output_tokens` - Number of output tokens
@@ -42,6 +42,11 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
 
   def calculate_cost(:anthropic, model, input_tokens, output_tokens) do
     {input_rate, output_rate} = get_anthropic_rates(model)
+    input_tokens * input_rate + output_tokens * output_rate
+  end
+
+  def calculate_cost(:deepseek, model, input_tokens, output_tokens) do
+    {input_rate, output_rate} = get_deepseek_rates(model)
     input_tokens * input_rate + output_tokens * output_rate
   end
 
@@ -128,5 +133,20 @@ defmodule MultiAgentCoder.Agent.TokenCounter do
   defp get_anthropic_rates(_) do
     # Default to Sonnet pricing
     {3 / 1_000_000, 15 / 1_000_000}
+  end
+
+  defp get_deepseek_rates("deepseek-coder" <> _) do
+    # DeepSeek Coder pricing: $0.14 per 1M input, $0.28 per 1M output
+    {0.14 / 1_000_000, 0.28 / 1_000_000}
+  end
+
+  defp get_deepseek_rates("deepseek-chat" <> _) do
+    # DeepSeek Chat pricing: $0.14 per 1M input, $0.28 per 1M output
+    {0.14 / 1_000_000, 0.28 / 1_000_000}
+  end
+
+  defp get_deepseek_rates(_) do
+    # Default to DeepSeek Coder pricing
+    {0.14 / 1_000_000, 0.28 / 1_000_000}
   end
 end
