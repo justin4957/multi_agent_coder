@@ -247,11 +247,11 @@ defmodule MultiAgentCoder.CLI.FormatterTest do
     test "formats seconds" do
       assert Formatter.format_time_ms(1000) == "1.0s"
       assert Formatter.format_time_ms(5500) == "5.5s"
-      assert Formatter.format_time_ms(59999) == "60.0s"
+      assert Formatter.format_time_ms(59_999) == "60.0s"
     end
 
     test "formats minutes" do
-      assert Formatter.format_time_ms(60000) == "1m 0s"
+      assert Formatter.format_time_ms(60_000) == "1m 0s"
       assert Formatter.format_time_ms(125_000) == "2m 5s"
       assert Formatter.format_time_ms(180_000) == "3m 0s"
     end

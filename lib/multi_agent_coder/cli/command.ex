@@ -6,7 +6,7 @@ defmodule MultiAgentCoder.CLI.Command do
   querying multiple AI agents concurrently.
   """
 
-  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup}
+  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup, InteractiveSession}
   alias MultiAgentCoder.Router.TaskRouter
   alias MultiAgentCoder.Monitor.Realtime
 
@@ -90,67 +90,14 @@ defmodule MultiAgentCoder.CLI.Command do
     end
   end
 
-  defp run_interactive_mode(_opts) do
-    IO.puts(Formatter.format_header("Multi-Agent Coder - Interactive Mode"))
-    IO.puts("Commands:")
-    IO.puts("  ask <prompt>       - Query all agents")
-    IO.puts("  compare <prompt>   - Compare agent responses")
-    IO.puts("  dialectic <prompt> - Run dialectical workflow")
-    IO.puts("  config             - Reconfigure API keys and providers")
-    IO.puts("  help               - Show this help")
-    IO.puts("  exit               - Exit interactive mode")
-    IO.puts("")
+  defp run_interactive_mode(opts) do
+    providers = parse_providers(opts[:providers])
 
-    interactive_loop()
+    InteractiveSession.start(
+      providers: providers,
+      display_mode: :stacked
+    )
   end
-
-  defp interactive_loop do
-    prompt = IO.gets("\n> ") |> String.trim()
-
-    case parse_interactive_command(prompt) do
-      {:exit} ->
-        IO.puts("Goodbye!")
-        :ok
-
-      {:help} ->
-        show_interactive_help()
-        interactive_loop()
-
-      {:config} ->
-        ConfigSetup.run_interactive_setup()
-        IO.puts("\n⚠️  Please restart the CLI for new configuration to take effect.")
-        interactive_loop()
-
-      {:ask, task} ->
-        results = TaskRouter.route_task(task, :all)
-        Formatter.display_results(results, [])
-        interactive_loop()
-
-      {:compare, task} ->
-        results = TaskRouter.route_task(task, :all)
-        Formatter.display_comparison(results)
-        interactive_loop()
-
-      {:dialectic, task} ->
-        results = TaskRouter.route_task(task, :dialectical)
-        Formatter.display_dialectical(results)
-        interactive_loop()
-
-      {:error, msg} ->
-        IO.puts("Error: #{msg}")
-        interactive_loop()
-    end
-  end
-
-  defp parse_interactive_command("exit"), do: {:exit}
-  defp parse_interactive_command("help"), do: {:help}
-  defp parse_interactive_command("config"), do: {:config}
-
-  defp parse_interactive_command("ask " <> task), do: {:ask, task}
-  defp parse_interactive_command("compare " <> task), do: {:compare, task}
-  defp parse_interactive_command("dialectic " <> task), do: {:dialectic, task}
-
-  defp parse_interactive_command(_), do: {:error, "Unknown command. Type 'help' for usage."}
 
   defp show_help do
     IO.puts("""
@@ -186,18 +133,6 @@ defmodule MultiAgentCoder.CLI.Command do
     """)
   end
 
-  defp show_interactive_help do
-    IO.puts("""
-    Interactive Commands:
-      ask <prompt>       - Query all agents with a prompt
-      compare <prompt>   - Compare responses from all agents
-      dialectic <prompt> - Run thesis/antithesis/synthesis workflow
-      config             - Reconfigure API keys and providers
-      help               - Show this help
-      exit               - Exit interactive mode
-    """)
-  end
-
   defp parse_strategy("all"), do: :all
   defp parse_strategy("parallel"), do: :parallel
   defp parse_strategy("sequential"), do: :sequential
@@ -206,6 +141,19 @@ defmodule MultiAgentCoder.CLI.Command do
   defp parse_strategy(providers) do
     providers
     |> String.split(",")
+    |> Enum.map(&String.to_atom/1)
+  end
+
+  defp parse_providers(nil) do
+    # Return all configured providers
+    Application.get_env(:multi_agent_coder, :providers, [])
+    |> Keyword.keys()
+  end
+
+  defp parse_providers(provider_string) do
+    provider_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
     |> Enum.map(&String.to_atom/1)
   end
 

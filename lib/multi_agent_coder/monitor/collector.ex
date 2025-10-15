@@ -38,8 +38,7 @@ defmodule MultiAgentCoder.Monitor.Collector do
     # Simple implementation - can be enhanced with NLP
     all_text =
       results
-      |> Enum.map(fn {_provider, {:ok, text}} -> text end)
-      |> Enum.join(" ")
+      |> Enum.map_join(" ", fn {_provider, {:ok, text}} -> text end)
 
     %{
       total_length: String.length(all_text),

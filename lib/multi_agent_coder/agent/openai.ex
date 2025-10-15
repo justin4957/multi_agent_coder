@@ -12,7 +12,7 @@ defmodule MultiAgentCoder.Agent.OpenAI do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter}
+  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
 
   @api_base "https://api.openai.com/v1"
 
@@ -127,15 +127,86 @@ defmodule MultiAgentCoder.Agent.OpenAI do
   end
 
   defp stream_request(state, messages) do
-    # Streaming implementation would go here
-    # For now, fall back to regular request
-    # In a full implementation, this would use Server-Sent Events
-    Logger.warning("OpenAI: Streaming not yet implemented, using regular request")
+    Logger.info("OpenAI: Starting streaming request")
 
-    case make_request(state, messages) do
-      {:ok, body} -> extract_response(body, state, List.last(messages)["content"])
-      error -> error
+    headers = [
+      {"Authorization", "Bearer #{state.api_key}"},
+      {"Content-Type", "application/json"}
+    ]
+
+    body = %{
+      model: state.model,
+      messages: messages,
+      temperature: state.temperature,
+      max_tokens: state.max_tokens,
+      stream: true
+    }
+
+    url = "#{@api_base}/chat/completions"
+    accumulated_content = ""
+    original_prompt = List.last(messages)[:content]
+
+    try do
+      case Req.post(url, headers: headers, json: body) do
+        {:ok, %Req.Response{status: 200, body: response_body}} ->
+          # Parse SSE stream and accumulate content
+          full_response = parse_stream_response(response_body, :openai, accumulated_content)
+
+          # Calculate usage statistics
+          usage =
+            TokenCounter.create_usage_summary(
+              :openai,
+              state.model,
+              original_prompt,
+              full_response
+            )
+
+          Streaming.broadcast_complete(:openai, full_response, usage)
+          {:ok, full_response, usage}
+
+        {:ok, %Req.Response{status: status, body: error_body}} ->
+          error_msg = "HTTP #{status}: #{inspect(error_body)}"
+          Streaming.broadcast_error(:openai, :http_error, error_msg)
+          {:error, {:http_error, error_msg}}
+
+        {:error, reason} ->
+          error_msg = "Request failed: #{inspect(reason)}"
+          Streaming.broadcast_error(:openai, :request_failed, error_msg)
+          {:error, classify_error({:network_error, reason})}
+      end
+    rescue
+      error ->
+        error_msg = "Streaming failed: #{Exception.message(error)}"
+        Logger.error("OpenAI: #{error_msg}")
+        Streaming.broadcast_error(:openai, :stream_error, error_msg)
+        {:error, {:stream_error, error_msg}}
     end
+  end
+
+  defp parse_stream_response(body, provider, accumulated) do
+    # OpenAI returns SSE format - split into lines and parse
+    body
+    |> String.split("\n")
+    |> Enum.reduce(accumulated, fn line, acc ->
+      case Streaming.parse_sse_line(line) do
+        {:ok, data} ->
+          # Extract content delta from OpenAI format
+          delta = get_in(data, ["choices", Access.at(0), "delta", "content"])
+
+          if delta do
+            Streaming.broadcast_chunk(provider, delta)
+            acc <> delta
+          else
+            acc
+          end
+
+        :done ->
+          acc
+
+        :skip ->
+          acc
+      end
+    end)
   end
 
   defp extract_response(body, state, original_prompt) do

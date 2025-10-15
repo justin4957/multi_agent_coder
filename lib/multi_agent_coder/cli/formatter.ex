@@ -156,8 +156,7 @@ defmodule MultiAgentCoder.CLI.Formatter do
   defp format_code_block(code) do
     code
     |> String.split("\n")
-    |> Enum.map(&("  " <> &1))
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &("  " <> &1))
   end
 
   defp count_code_blocks(text) do
@@ -196,16 +195,15 @@ defmodule MultiAgentCoder.CLI.Formatter do
   defp print_row(cells, widths) do
     cells
     |> Enum.zip(widths)
-    |> Enum.map(fn {cell, width} ->
+    |> Enum.map_join(" | ", fn {cell, width} ->
       String.pad_trailing(cell, width)
     end)
-    |> Enum.join(" | ")
     |> IO.puts()
   end
 
   defp format_standard_for_file(results) do
     results
-    |> Enum.map(fn {provider, result} ->
+    |> Enum.map_join("\n\n", fn {provider, result} ->
       """
       ====================================
       #{String.upcase(to_string(provider))}
@@ -214,7 +212,6 @@ defmodule MultiAgentCoder.CLI.Formatter do
       #{format_result_content(result)}
       """
     end)
-    |> Enum.join("\n\n")
   end
 
   defp format_dialectical_for_file(results) do

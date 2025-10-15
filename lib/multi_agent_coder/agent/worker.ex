@@ -52,6 +52,15 @@ defmodule MultiAgentCoder.Agent.Worker do
   end
 
   @doc """
+  Executes a task with streaming enabled.
+
+  Streams response chunks via PubSub and returns the complete response.
+  """
+  def execute_task_streaming(provider, prompt, context \\ %{}) do
+    GenServer.call(via_tuple(provider), {:execute_streaming, prompt, context}, 120_000)
+  end
+
+  @doc """
   Gets the current status of an agent.
   """
   def get_status(provider) do
@@ -100,6 +109,36 @@ defmodule MultiAgentCoder.Agent.Worker do
     # Normalize result format and broadcast completion
     normalized_result = normalize_result(result)
     broadcast_complete(state.provider, normalized_result)
+
+    {:reply, normalized_result, final_state}
+  end
+
+  @impl true
+  def handle_call({:execute_streaming, prompt, context}, _from, state) do
+    Logger.info("#{state.provider}: Starting streaming task execution")
+
+    new_state = %{state | status: :working, current_task: prompt}
+
+    # Broadcast status update
+    broadcast_status(state.provider, :working)
+
+    # Execute with streaming based on provider
+    result =
+      case state.provider do
+        :openai -> MultiAgentCoder.Agent.OpenAI.call_streaming(state, prompt, context)
+        :anthropic -> MultiAgentCoder.Agent.Anthropic.call_streaming(state, prompt, context)
+        :deepseek -> MultiAgentCoder.Agent.DeepSeek.call_streaming(state, prompt, context)
+        :perplexity -> MultiAgentCoder.Agent.Perplexity.call_streaming(state, prompt, context)
+        # Local doesn't support streaming yet
+        :local -> MultiAgentCoder.Agent.Local.call(state, prompt, context)
+      end
+
+    final_state = %{new_state | status: :idle, current_task: nil}
+
+    # Normalize result format
+    # Note: We don't broadcast_complete here because the streaming functions
+    # already do that via the Streaming module
+    normalized_result = normalize_result(result)
 
     {:reply, normalized_result, final_state}
   end
