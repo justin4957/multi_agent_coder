@@ -37,6 +37,8 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
   use GenServer
   require Logger
 
+  alias MultiAgentCoder.CLI.DisplayConfig
+
   defstruct [
     :providers,
     :provider_states,
@@ -44,7 +46,10 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
     :provider_start_times,
     :display_mode,
     :terminal_width,
-    :terminal_height
+    :terminal_height,
+    :focused_provider,
+    :scroll_positions,
+    :config
   ]
 
   # Status icons and colors
@@ -115,7 +120,10 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
       provider_start_times: %{},
       display_mode: :stacked,
       terminal_width: get_terminal_width(),
-      terminal_height: get_terminal_height()
+      terminal_height: get_terminal_height(),
+      focused_provider: nil,
+      scroll_positions: %{},
+      config: DisplayConfig.get_all()
     }
 
     {:ok, state}
@@ -123,7 +131,9 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
 
   @impl true
   def handle_call({:start_display, providers, opts}, _from, state) do
-    display_mode = Keyword.get(opts, :display_mode, :stacked)
+    # Use configured layout or override from opts
+    config_layout = state.config[:layout]
+    display_mode = Keyword.get(opts, :display_mode, config_layout)
 
     # Subscribe to all providers
     Enum.each(providers, fn provider ->
@@ -146,18 +156,26 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
       |> Enum.map(&{&1, System.monotonic_time(:millisecond)})
       |> Enum.into(%{})
 
+    scroll_positions =
+      providers
+      |> Enum.map(&{&1, 0})
+      |> Enum.into(%{})
+
     new_state = %{
       state
       | providers: providers,
         provider_states: provider_states,
         provider_content: provider_content,
         provider_start_times: provider_start_times,
-        display_mode: display_mode
+        display_mode: display_mode,
+        focused_provider: List.first(providers),
+        scroll_positions: scroll_positions
     }
 
     # Clear screen and render initial display
     clear_screen()
     render_display(new_state)
+    render_navigation_hint()
 
     {:reply, :ok, new_state}
   end
@@ -273,9 +291,125 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
   end
 
   defp render_split_horizontal(state) do
-    # For MVP, just use stacked layout
-    # Full horizontal split would require more complex terminal handling
-    render_stacked_layout(state)
+    # Implement side-by-side layout for 2 providers
+    case length(state.providers) do
+      2 ->
+        render_side_by_side(state)
+
+      _ ->
+        # Fall back to stacked for 1 or 3+ providers
+        render_stacked_layout(state)
+    end
+  end
+
+  defp render_side_by_side(state) do
+    [left_provider, right_provider] = state.providers
+
+    left_content = Map.get(state.provider_content, left_provider, "")
+    right_content = Map.get(state.provider_content, right_provider, "")
+
+    left_status = Map.get(state.provider_states, left_provider, :idle)
+    right_status = Map.get(state.provider_states, right_provider, :idle)
+
+    pane_width = div(state.terminal_width - 3, 2)
+    max_lines = state.terminal_height - 5
+
+    # Render headers side-by-side
+    left_header = format_pane_header(left_provider, left_status, state, pane_width)
+    right_header = format_pane_header(right_provider, right_status, state, pane_width)
+
+    IO.write([left_header, "│", right_header, "\n"])
+
+    # Render content side-by-side
+    left_lines = String.split(left_content, "\n") |> Enum.take(max_lines)
+    right_lines = String.split(right_content, "\n") |> Enum.take(max_lines)
+
+    max_content_lines = max(length(left_lines), length(right_lines))
+
+    0..(max_content_lines - 1)
+    |> Enum.each(fn i ->
+      left_line = Enum.at(left_lines, i, "")
+      right_line = Enum.at(right_lines, i, "")
+
+      left_formatted = format_pane_content_line(left_provider, left_line, state, pane_width)
+      right_formatted = format_pane_content_line(right_provider, right_line, state, pane_width)
+
+      IO.write([left_formatted, "│", right_formatted, "\n"])
+    end)
+
+    # Render footers
+    left_footer = format_pane_footer(left_provider, state, pane_width)
+    right_footer = format_pane_footer(right_provider, state, pane_width)
+
+    IO.write([left_footer, "┴", right_footer, "\n"])
+  end
+
+  defp format_pane_header(provider, status, state, width) do
+    provider_name = provider |> to_string() |> String.capitalize()
+    elapsed = get_elapsed_time(provider, state)
+
+    provider_color = Map.get(@provider_colors, provider, IO.ANSI.white())
+    _status_color = Map.get(@status_colors, status)
+    status_icon = Map.get(@status_icons, status)
+
+    focus_indicator =
+      if state.focused_provider == provider and state.config[:show_progress], do: "▶ ", else: ""
+
+    header_text = "#{focus_indicator}#{provider_name} #{status_icon} #{elapsed}"
+    padding = max(0, width - String.length(header_text) - 4)
+
+    [
+      provider_color,
+      "┌─ ",
+      header_text,
+      String.duplicate("─", padding),
+      "─┐",
+      IO.ANSI.reset()
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp format_pane_content_line(provider, line, _state, width) do
+    provider_color = Map.get(@provider_colors, provider, IO.ANSI.white())
+    truncated = String.slice(line, 0, width - 4)
+    padding = max(0, width - String.length(truncated) - 4)
+
+    [
+      provider_color,
+      "│ ",
+      IO.ANSI.reset(),
+      truncated,
+      String.duplicate(" ", padding),
+      provider_color,
+      " │",
+      IO.ANSI.reset()
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp format_pane_footer(provider, _state, width) do
+    provider_color = Map.get(@provider_colors, provider, IO.ANSI.white())
+
+    [
+      provider_color,
+      "└",
+      String.duplicate("─", width - 2),
+      "┘",
+      IO.ANSI.reset()
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp render_navigation_hint do
+    if DisplayConfig.get(:show_progress) do
+      IO.write([
+        "\n",
+        IO.ANSI.faint(),
+        "Press Ctrl+C to cancel | Responses streaming in real-time",
+        IO.ANSI.reset(),
+        "\n"
+      ])
+    end
   end
 
   defp render_provider_pane(provider, state) do
@@ -285,24 +419,23 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
 
     provider_name = provider |> to_string() |> String.capitalize()
     provider_color = Map.get(@provider_colors, provider, IO.ANSI.white())
-    status_color = Map.get(@status_colors, status)
+    _status_color = Map.get(@status_colors, status)
     status_icon = Map.get(@status_icons, status)
 
+    focus_indicator =
+      if state.focused_provider == provider and state.config[:show_progress], do: "▶ ", else: ""
+
     # Render pane header
+    header_text = "#{focus_indicator}#{provider_name} #{status_icon} #{elapsed}"
+
+    header_padding =
+      max(0, state.terminal_width - String.length(header_text) - 6)
+
     header = [
       provider_color,
       "┌─ ",
-      provider_name,
-      " ",
-      status_color,
-      status_icon,
-      " ",
-      elapsed,
-      provider_color,
-      String.duplicate(
-        "─",
-        max(0, state.terminal_width - String.length(provider_name) - String.length(elapsed) - 10)
-      ),
+      header_text,
+      String.duplicate("─", header_padding),
       "┐",
       IO.ANSI.reset(),
       "\n"
@@ -311,7 +444,17 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
     IO.write(header)
 
     # Render content (truncated to fit pane)
-    max_lines = div(state.terminal_height, length(state.providers)) - 3
+    # Use configured max_pane_height or calculate based on available space
+    max_lines =
+      if state.config[:compact_mode] do
+        state.config[:max_pane_height]
+      else
+        min(
+          state.config[:max_pane_height],
+          div(state.terminal_height, length(state.providers)) - 3
+        )
+      end
+
     content_lines = String.split(content, "\n") |> Enum.take(max_lines)
 
     Enum.each(content_lines, fn line ->
