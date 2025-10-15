@@ -12,7 +12,7 @@ defmodule MultiAgentCoder.Agent.Anthropic do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter}
+  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
 
   @api_base "https://api.anthropic.com/v1"
   @api_version "2023-06-01"
@@ -132,14 +132,98 @@ defmodule MultiAgentCoder.Agent.Anthropic do
   end
 
   defp stream_request(state, system_prompt, messages) do
-    # Streaming implementation would use SSE
-    # For now, fall back to regular request
-    Logger.warning("Anthropic: Streaming not yet fully implemented, using regular request")
+    Logger.info("Anthropic: Starting streaming request")
 
-    case make_request(state, system_prompt, messages) do
-      {:ok, body} -> extract_response(body, state, List.last(messages)["content"])
-      error -> error
+    headers = [
+      {"x-api-key", state.api_key},
+      {"anthropic-version", @api_version},
+      {"Content-Type", "application/json"}
+    ]
+
+    body = %{
+      model: state.model,
+      system: system_prompt,
+      messages: messages,
+      temperature: state.temperature,
+      max_tokens: state.max_tokens,
+      stream: true
+    }
+
+    url = "#{@api_base}/messages"
+    accumulated_content = ""
+    original_prompt = List.last(messages)[:content]
+
+    try do
+      case Req.post(url, headers: headers, json: body) do
+        {:ok, %Req.Response{status: 200, body: response_body}} ->
+          # Parse SSE stream and accumulate content
+          full_response = parse_anthropic_stream(response_body, accumulated_content)
+
+          # Calculate usage statistics
+          usage =
+            TokenCounter.create_usage_summary(
+              :anthropic,
+              state.model,
+              original_prompt,
+              full_response
+            )
+
+          Streaming.broadcast_complete(:anthropic, full_response, usage)
+          {:ok, full_response, usage}
+
+        {:ok, %Req.Response{status: status, body: error_body}} ->
+          error_msg = "HTTP #{status}: #{inspect(error_body)}"
+          Streaming.broadcast_error(:anthropic, :http_error, error_msg)
+          {:error, {:http_error, error_msg}}
+
+        {:error, reason} ->
+          error_msg = "Request failed: #{inspect(reason)}"
+          Streaming.broadcast_error(:anthropic, :request_failed, error_msg)
+          {:error, classify_error({:network_error, reason})}
+      end
+    rescue
+      error ->
+        error_msg = "Streaming failed: #{Exception.message(error)}"
+        Logger.error("Anthropic: #{error_msg}")
+        Streaming.broadcast_error(:anthropic, :stream_error, error_msg)
+        {:error, {:stream_error, error_msg}}
     end
+  end
+
+  defp parse_anthropic_stream(body, accumulated) do
+    # Anthropic returns SSE format - split into lines and parse
+    body
+    |> String.split("\n")
+    |> Enum.reduce(accumulated, fn line, acc ->
+      case Streaming.parse_sse_line(line) do
+        {:ok, data} ->
+          # Anthropic sends different event types
+          event_type = Map.get(data, "type")
+
+          case event_type do
+            "content_block_delta" ->
+              # Extract text delta from content block
+              delta = get_in(data, ["delta", "text"])
+
+              if delta do
+                Streaming.broadcast_chunk(:anthropic, delta)
+                acc <> delta
+              else
+                acc
+              end
+
+            _ ->
+              # Other event types (content_block_start, message_start, etc.)
+              acc
+          end
+
+        :done ->
+          acc
+
+        :skip ->
+          acc
+      end
+    end)
   end
 
   defp extract_response(body, state, original_prompt) do

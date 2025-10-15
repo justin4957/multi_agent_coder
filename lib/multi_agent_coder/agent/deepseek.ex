@@ -15,7 +15,7 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter}
+  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
 
   @api_base "https://api.deepseek.com/v1"
 
@@ -137,15 +137,86 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
   end
 
   defp stream_request(state, messages) do
-    # Streaming implementation would go here
-    # For now, fall back to regular request
-    # In a full implementation, this would use Server-Sent Events
-    Logger.warning("DeepSeek: Streaming not yet implemented, using regular request")
+    Logger.info("DeepSeek: Starting streaming request")
 
-    case make_request(state, messages) do
-      {:ok, body} -> extract_response(body, state, List.last(messages)["content"])
-      error -> error
+    headers = [
+      {"Authorization", "Bearer #{state.api_key}"},
+      {"Content-Type", "application/json"}
+    ]
+
+    body = %{
+      model: state.model,
+      messages: messages,
+      temperature: state.temperature,
+      max_tokens: state.max_tokens,
+      stream: true
+    }
+
+    url = "#{@api_base}/chat/completions"
+    accumulated_content = ""
+    original_prompt = List.last(messages)[:content]
+
+    try do
+      case Req.post(url, headers: headers, json: body) do
+        {:ok, %Req.Response{status: 200, body: response_body}} ->
+          # Parse SSE stream (DeepSeek uses OpenAI-compatible format)
+          full_response = parse_stream_response(response_body, :deepseek, accumulated_content)
+
+          # Calculate usage statistics
+          usage =
+            TokenCounter.create_usage_summary(
+              :deepseek,
+              state.model,
+              original_prompt,
+              full_response
+            )
+
+          Streaming.broadcast_complete(:deepseek, full_response, usage)
+          {:ok, full_response, usage}
+
+        {:ok, %Req.Response{status: status, body: error_body}} ->
+          error_msg = "HTTP #{status}: #{inspect(error_body)}"
+          Streaming.broadcast_error(:deepseek, :http_error, error_msg)
+          {:error, {:http_error, error_msg}}
+
+        {:error, reason} ->
+          error_msg = "Request failed: #{inspect(reason)}"
+          Streaming.broadcast_error(:deepseek, :request_failed, error_msg)
+          {:error, classify_error({:network_error, reason})}
+      end
+    rescue
+      error ->
+        error_msg = "Streaming failed: #{Exception.message(error)}"
+        Logger.error("DeepSeek: #{error_msg}")
+        Streaming.broadcast_error(:deepseek, :stream_error, error_msg)
+        {:error, {:stream_error, error_msg}}
     end
+  end
+
+  defp parse_stream_response(body, provider, accumulated) do
+    # DeepSeek uses OpenAI-compatible SSE format
+    body
+    |> String.split("\n")
+    |> Enum.reduce(accumulated, fn line, acc ->
+      case Streaming.parse_sse_line(line) do
+        {:ok, data} ->
+          # Extract content delta from OpenAI-compatible format
+          delta = get_in(data, ["choices", Access.at(0), "delta", "content"])
+
+          if delta do
+            Streaming.broadcast_chunk(provider, delta)
+            acc <> delta
+          else
+            acc
+          end
+
+        :done ->
+          acc
+
+        :skip ->
+          acc
+      end
+    end)
   end
 
   defp extract_response(body, state, original_prompt) do

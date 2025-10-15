@@ -17,7 +17,7 @@ defmodule MultiAgentCoder.Agent.Perplexity do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter}
+  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
 
   @api_base "https://api.perplexity.ai"
 
@@ -53,6 +53,19 @@ defmodule MultiAgentCoder.Agent.Perplexity do
       {:error, reason} = error ->
         Logger.error("Perplexity: Request failed - #{inspect(reason)}")
         error
+    end
+  end
+
+  @doc """
+  Makes a streaming API call to Perplexity.
+
+  Returns an async stream of response chunks.
+  """
+  def call_streaming(state, prompt, context \\ %{}) do
+    Logger.info("Perplexity: Starting streaming call with #{state.model}")
+
+    with {:ok, messages} <- build_messages(prompt, context) do
+      stream_request(state, messages)
     end
   end
 
@@ -133,6 +146,91 @@ defmodule MultiAgentCoder.Agent.Perplexity do
       {:error, reason} ->
         {:error, classify_error(reason)}
     end
+  end
+
+  defp stream_request(state, messages) do
+    Logger.info("Perplexity: Starting streaming request")
+
+    headers = [
+      {"Authorization", "Bearer #{state.api_key}"},
+      {"Content-Type", "application/json"}
+    ]
+
+    body = %{
+      model: state.model,
+      messages: messages,
+      temperature: state.temperature,
+      max_tokens: state.max_tokens,
+      return_citations: true,
+      return_related_questions: false,
+      stream: true
+    }
+
+    url = "#{@api_base}/chat/completions"
+    accumulated_content = ""
+    original_prompt = List.last(messages)[:content]
+
+    try do
+      case Req.post(url, headers: headers, json: body) do
+        {:ok, %Req.Response{status: 200, body: response_body}} ->
+          # Parse SSE stream (Perplexity uses OpenAI-compatible format)
+          full_response = parse_stream_response(response_body, :perplexity, accumulated_content)
+
+          # Calculate usage statistics
+          usage =
+            TokenCounter.create_usage_summary(
+              :perplexity,
+              state.model,
+              original_prompt,
+              full_response
+            )
+
+          Streaming.broadcast_complete(:perplexity, full_response, usage)
+          {:ok, full_response, usage}
+
+        {:ok, %Req.Response{status: status, body: error_body}} ->
+          error_msg = "HTTP #{status}: #{inspect(error_body)}"
+          Streaming.broadcast_error(:perplexity, :http_error, error_msg)
+          {:error, {:http_error, error_msg}}
+
+        {:error, reason} ->
+          error_msg = "Request failed: #{inspect(reason)}"
+          Streaming.broadcast_error(:perplexity, :request_failed, error_msg)
+          {:error, classify_error({:network_error, reason})}
+      end
+    rescue
+      error ->
+        error_msg = "Streaming failed: #{Exception.message(error)}"
+        Logger.error("Perplexity: #{error_msg}")
+        Streaming.broadcast_error(:perplexity, :stream_error, error_msg)
+        {:error, {:stream_error, error_msg}}
+    end
+  end
+
+  defp parse_stream_response(body, provider, accumulated) do
+    # Perplexity uses OpenAI-compatible SSE format
+    body
+    |> String.split("\n")
+    |> Enum.reduce(accumulated, fn line, acc ->
+      case Streaming.parse_sse_line(line) do
+        {:ok, data} ->
+          # Extract content delta from OpenAI-compatible format
+          delta = get_in(data, ["choices", Access.at(0), "delta", "content"])
+
+          if delta do
+            Streaming.broadcast_chunk(provider, delta)
+            acc <> delta
+          else
+            acc
+          end
+
+        :done ->
+          acc
+
+        :skip ->
+          acc
+      end
+    end)
   end
 
   defp extract_response(body, state, original_prompt) do

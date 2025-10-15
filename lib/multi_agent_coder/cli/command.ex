@@ -6,7 +6,7 @@ defmodule MultiAgentCoder.CLI.Command do
   querying multiple AI agents concurrently.
   """
 
-  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup}
+  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup, InteractiveSession}
   alias MultiAgentCoder.Router.TaskRouter
   alias MultiAgentCoder.Monitor.Realtime
 
@@ -90,18 +90,13 @@ defmodule MultiAgentCoder.CLI.Command do
     end
   end
 
-  defp run_interactive_mode(_opts) do
-    IO.puts(Formatter.format_header("Multi-Agent Coder - Interactive Mode"))
-    IO.puts("Commands:")
-    IO.puts("  ask <prompt>       - Query all agents")
-    IO.puts("  compare <prompt>   - Compare agent responses")
-    IO.puts("  dialectic <prompt> - Run dialectical workflow")
-    IO.puts("  config             - Reconfigure API keys and providers")
-    IO.puts("  help               - Show this help")
-    IO.puts("  exit               - Exit interactive mode")
-    IO.puts("")
+  defp run_interactive_mode(opts) do
+    providers = parse_providers(opts[:providers])
 
-    interactive_loop()
+    InteractiveSession.start(
+      providers: providers,
+      display_mode: :stacked
+    )
   end
 
   defp interactive_loop do
@@ -206,6 +201,19 @@ defmodule MultiAgentCoder.CLI.Command do
   defp parse_strategy(providers) do
     providers
     |> String.split(",")
+    |> Enum.map(&String.to_atom/1)
+  end
+
+  defp parse_providers(nil) do
+    # Return all configured providers
+    Application.get_env(:multi_agent_coder, :providers, [])
+    |> Keyword.keys()
+  end
+
+  defp parse_providers(provider_string) do
+    provider_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
     |> Enum.map(&String.to_atom/1)
   end
 
