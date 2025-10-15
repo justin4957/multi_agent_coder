@@ -262,8 +262,7 @@ defmodule MultiAgentCoder.Agent.Anthropic do
         text =
           content_blocks
           |> Enum.filter(&(&1["type"] == "text"))
-          |> Enum.map(& &1["text"])
-          |> Enum.join("\n")
+          |> Enum.map_join("\n", & &1["text"])
 
         if text == "" do
           {:error, :no_text_content}

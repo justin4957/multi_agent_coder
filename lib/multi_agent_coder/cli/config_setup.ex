@@ -288,9 +288,7 @@ defmodule MultiAgentCoder.CLI.ConfigSetup do
   end
 
   defp generate_provider_configs(provider_configs) do
-    provider_configs
-    |> Enum.map(&format_provider_config/1)
-    |> Enum.join(",\n")
+    Enum.map_join(provider_configs, ",\n", &format_provider_config/1)
   end
 
   defp format_provider_config(%{name: :local, endpoint: endpoint, model: model}) do

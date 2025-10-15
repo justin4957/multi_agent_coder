@@ -118,9 +118,7 @@ defmodule MultiAgentCoder.Agent.ContextFormatter do
   end
 
   defp format_files(files) when is_list(files) do
-    files
-    |> Enum.map(&format_file/1)
-    |> Enum.join("\n\n")
+    Enum.map_join(files, "\n\n", &format_file/1)
   end
 
   defp format_file(%{path: path, content: content}) do

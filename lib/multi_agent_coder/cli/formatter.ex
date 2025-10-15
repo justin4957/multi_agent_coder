@@ -156,8 +156,7 @@ defmodule MultiAgentCoder.CLI.Formatter do
   defp format_code_block(code) do
     code
     |> String.split("\n")
-    |> Enum.map(&("  " <> &1))
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &("  " <> &1))
   end
 
   defp count_code_blocks(text) do

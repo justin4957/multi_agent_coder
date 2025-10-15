@@ -300,8 +300,7 @@ defmodule MultiAgentCoder.Agent.Perplexity do
       citation_text =
         citations
         |> Enum.with_index(1)
-        |> Enum.map(fn {url, idx} -> "  [#{idx}] #{url}" end)
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", fn {url, idx} -> "  [#{idx}] #{url}" end)
 
       """
       #{content}
