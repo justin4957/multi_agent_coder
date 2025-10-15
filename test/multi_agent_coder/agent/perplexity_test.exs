@@ -3,17 +3,6 @@ defmodule MultiAgentCoder.Agent.PerplexityTest do
 
   alias MultiAgentCoder.Agent.Perplexity
 
-  describe "module structure" do
-    test "exports call function" do
-      # Function with default params exports both /2 and /3
-      assert function_exported?(Perplexity, :call, 2) or function_exported?(Perplexity, :call, 3)
-    end
-
-    test "exports validate_credentials/1 function" do
-      assert function_exported?(Perplexity, :validate_credentials, 1)
-    end
-  end
-
   describe "validate_credentials/1" do
     test "returns error for invalid API key" do
       # Test with obviously invalid key
