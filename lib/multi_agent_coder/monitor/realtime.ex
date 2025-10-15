@@ -119,11 +119,11 @@ defmodule MultiAgentCoder.Monitor.Realtime do
 
     # Start display update loop
     final_state =
-      unless quiet_mode do
+      if quiet_mode do
+        new_state
+      else
         pid = spawn_link(fn -> display_loop(self()) end)
         %{new_state | display_pid: pid}
-      else
-        new_state
       end
 
     {:reply, :ok, final_state}
@@ -232,11 +232,10 @@ defmodule MultiAgentCoder.Monitor.Realtime do
     # Display each agent status on a single line
     status_line =
       state.active_agents
-      |> Enum.map(fn provider ->
+      |> Enum.map_join(" ", fn provider ->
         status = Map.get(state.agent_statuses, provider, :idle)
         format_agent_status(provider, status, state)
       end)
-      |> Enum.join(" ")
 
     IO.write(status_line)
   end
