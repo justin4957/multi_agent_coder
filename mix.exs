@@ -52,7 +52,7 @@ defmodule MultiAgentCoder.MixProject do
             MultiAgentCoder.CLI.Formatter,
             MultiAgentCoder.CLI.ConfigSetup
           ],
-          "Monitoring": [
+          Monitoring: [
             MultiAgentCoder.Monitor.Realtime
           ]
         ]

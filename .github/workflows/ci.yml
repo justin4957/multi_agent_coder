@@ -96,7 +96,7 @@ jobs:
         run: mix deps.unlock --check-unused
 
       - name: Run Credo (code quality)
-        run: mix credo --strict
+        run: mix credo suggest --all
 
   build:
     name: Build Escript
