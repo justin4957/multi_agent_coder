@@ -16,6 +16,53 @@ defmodule MultiAgentCoder.MixProject do
         "coveralls.post": :test,
         "coveralls.html": :test,
         "coveralls.json": :test
+      ],
+
+      # Docs
+      name: "MultiAgent Coder",
+      source_url: "https://github.com/justin4957/multi_agent_coder",
+      homepage_url: "https://github.com/justin4957/multi_agent_coder",
+      docs: [
+        main: "readme",
+        extras: ["README.md"],
+        groups_for_modules: [
+          "Agent Providers": [
+            MultiAgentCoder.Agent.Worker,
+            MultiAgentCoder.Agent.OpenAI,
+            MultiAgentCoder.Agent.Anthropic,
+            MultiAgentCoder.Agent.DeepSeek,
+            MultiAgentCoder.Agent.Perplexity,
+            MultiAgentCoder.Agent.Local,
+            MultiAgentCoder.Agent.HTTPClient,
+            MultiAgentCoder.Agent.TokenCounter,
+            MultiAgentCoder.Agent.ContextFormatter
+          ],
+          "Router & Strategy": [
+            MultiAgentCoder.Router.TaskRouter,
+            MultiAgentCoder.Router.Strategy
+          ],
+          "Session Management": [
+            MultiAgentCoder.Session.Manager,
+            MultiAgentCoder.Session.Storage,
+            MultiAgentCoder.Session.Message,
+            MultiAgentCoder.Session.Session
+          ],
+          "CLI Interface": [
+            MultiAgentCoder.CLI.Command,
+            MultiAgentCoder.CLI.Formatter,
+            MultiAgentCoder.CLI.ConfigSetup
+          ],
+          Monitoring: [
+            MultiAgentCoder.Monitor.Realtime
+          ]
+        ]
+      ],
+
+      # Dialyzer
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit],
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        flags: [:unmatched_returns, :error_handling, :underspecs]
       ]
     ]
   end
@@ -48,7 +95,13 @@ defmodule MultiAgentCoder.MixProject do
       # Progress indication for long-running tasks
       {:progress_bar, "~> 3.0"},
       # Code coverage reporting
-      {:excoveralls, "~> 0.18", only: :test}
+      {:excoveralls, "~> 0.18", only: :test},
+      # Documentation generation
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      # Code quality and static analysis
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      # Type checking with Dialyzer
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 end
