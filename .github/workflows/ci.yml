@@ -97,7 +97,7 @@ jobs:
 
       - name: Run Credo (code quality)
         run: mix credo || true
-        continue-on-error: true
+        continue-on-error: false
 
   build:
     name: Build Escript
