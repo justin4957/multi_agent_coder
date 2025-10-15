@@ -40,7 +40,7 @@ defmodule MultiAgentCoder.Agent.TokenCounterTest do
       cost = TokenCounter.calculate_cost(:perplexity, "sonar", 1000, 2000)
       assert cost > 0
       # Sonar: $1/1M input, $1/1M output
-      expected = 1000 * 1 / 1_000_000 + 2000 * 1 / 1_000_000
+      expected = 1000 / 1_000_000 + 2000 / 1_000_000
       assert_in_delta cost, expected, 0.0001
     end
 
