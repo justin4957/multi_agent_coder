@@ -31,7 +31,6 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
   alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter}
   alias MultiAgentCoder.Agent.Worker
-  alias MultiAgentCoder.Session.Storage
 
   @doc """
   Starts an interactive session with specified providers.

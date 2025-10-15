@@ -37,8 +37,6 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.Agent.Streaming
-
   defstruct [
     :providers,
     :provider_states,
@@ -238,7 +236,7 @@ defmodule MultiAgentCoder.CLI.ConcurrentDisplay do
   end
 
   @impl true
-  def handle_info({:status_change, status}, state) do
+  def handle_info({:status_change, _status}, state) do
     # Handle generic status changes if needed
     {:noreply, state}
   end

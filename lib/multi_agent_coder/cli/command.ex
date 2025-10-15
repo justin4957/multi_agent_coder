@@ -99,54 +99,6 @@ defmodule MultiAgentCoder.CLI.Command do
     )
   end
 
-  defp interactive_loop do
-    prompt = IO.gets("\n> ") |> String.trim()
-
-    case parse_interactive_command(prompt) do
-      {:exit} ->
-        IO.puts("Goodbye!")
-        :ok
-
-      {:help} ->
-        show_interactive_help()
-        interactive_loop()
-
-      {:config} ->
-        ConfigSetup.run_interactive_setup()
-        IO.puts("\n⚠️  Please restart the CLI for new configuration to take effect.")
-        interactive_loop()
-
-      {:ask, task} ->
-        results = TaskRouter.route_task(task, :all)
-        Formatter.display_results(results, [])
-        interactive_loop()
-
-      {:compare, task} ->
-        results = TaskRouter.route_task(task, :all)
-        Formatter.display_comparison(results)
-        interactive_loop()
-
-      {:dialectic, task} ->
-        results = TaskRouter.route_task(task, :dialectical)
-        Formatter.display_dialectical(results)
-        interactive_loop()
-
-      {:error, msg} ->
-        IO.puts("Error: #{msg}")
-        interactive_loop()
-    end
-  end
-
-  defp parse_interactive_command("exit"), do: {:exit}
-  defp parse_interactive_command("help"), do: {:help}
-  defp parse_interactive_command("config"), do: {:config}
-
-  defp parse_interactive_command("ask " <> task), do: {:ask, task}
-  defp parse_interactive_command("compare " <> task), do: {:compare, task}
-  defp parse_interactive_command("dialectic " <> task), do: {:dialectic, task}
-
-  defp parse_interactive_command(_), do: {:error, "Unknown command. Type 'help' for usage."}
-
   defp show_help do
     IO.puts("""
     MultiAgent Coder - Concurrent AI Coding Assistant
@@ -178,18 +130,6 @@ defmodule MultiAgentCoder.CLI.Command do
 
       # Interactive mode
       multi_agent_coder -i
-    """)
-  end
-
-  defp show_interactive_help do
-    IO.puts("""
-    Interactive Commands:
-      ask <prompt>       - Query all agents with a prompt
-      compare <prompt>   - Compare responses from all agents
-      dialectic <prompt> - Run thesis/antithesis/synthesis workflow
-      config             - Reconfigure API keys and providers
-      help               - Show this help
-      exit               - Exit interactive mode
     """)
   end
 
