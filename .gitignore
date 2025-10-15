@@ -35,3 +35,6 @@ multi_agent_coder-*.tar
 
 # Dialyzer PLT files
 /priv/plts/
+
+# Claude Code project-specific configuration
+/.claude/
