@@ -29,7 +29,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
   require Logger
 
-  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter}
+  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
   alias MultiAgentCoder.Agent.Worker
 
   @doc """
@@ -70,8 +70,31 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp interactive_loop(state) do
-    prompt = IO.gets("\n> ") |> String.trim()
+    # Use REPL for enhanced input with multi-line support
+    case REPL.read_input() do
+      {:ok, command} ->
+        # Save to history
+        MultiAgentCoder.CLI.History.append(command)
 
+        # Process command
+        process_repl_command(command, state)
+
+      :exit ->
+        IO.puts("\nGoodbye! 👋")
+        :ok
+
+      {:error, reason} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error reading input: #{inspect(reason)}",
+          IO.ANSI.reset()
+        ])
+
+        interactive_loop(state)
+    end
+  end
+
+  defp process_repl_command(prompt, state) do
     case parse_command(prompt) do
       {:exit} ->
         IO.puts("Goodbye!")
@@ -79,6 +102,19 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
       {:help} ->
         show_help()
+        interactive_loop(state)
+
+      {:history, :list} ->
+        display_history()
+        interactive_loop(state)
+
+      {:history, :clear} ->
+        MultiAgentCoder.CLI.History.clear()
+        IO.puts("History cleared.")
+        interactive_loop(state)
+
+      {:history, {:search, pattern}} ->
+        search_history(pattern)
         interactive_loop(state)
 
       {:accept, index} ->
@@ -104,8 +140,17 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp parse_command("exit"), do: {:exit}
+  defp parse_command("quit"), do: {:exit}
+  defp parse_command("q"), do: {:exit}
   defp parse_command("help"), do: {:help}
+  defp parse_command("?"), do: {:help}
   defp parse_command("compare"), do: {:compare}
+  defp parse_command("history"), do: {:history, :list}
+  defp parse_command("history clear"), do: {:history, :clear}
+
+  defp parse_command("history search " <> pattern) do
+    {:history, {:search, pattern}}
+  end
 
   defp parse_command("accept " <> index_str) do
     case Integer.parse(index_str) do
@@ -239,16 +284,64 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
                           (1 = first provider, 2 = second, etc.)
       compare            - Show all responses side-by-side for comparison
       save <name>        - Save current session to sessions/<name>.json
-      help               - Show this help message
-      exit               - Exit interactive mode
+      history            - Show recent command history
+      history search <pattern>  - Search history for commands matching pattern
+      history clear      - Clear all history
+      help, ?            - Show this help message
+      exit, quit, q      - Exit interactive mode
+
+    Multi-line Input:
+      Use \\ at end of line to continue on next line
+      Unclosed quotes and brackets automatically continue to next line
 
     Examples:
       > Write a Python function to reverse a linked list
       > accept 2
       > compare
       > save linkedlist-session
+
+      > Write a function to \\
+      ... parse CSV files
+
+      > history search "parse"
       > exit
     """)
+  end
+
+  defp display_history do
+    history = MultiAgentCoder.CLI.History.last(20)
+
+    if Enum.empty?(history) do
+      IO.puts("No command history.")
+    else
+      IO.puts([IO.ANSI.cyan(), "Recent commands:", IO.ANSI.reset()])
+
+      history
+      |> Enum.with_index(1)
+      |> Enum.each(fn {cmd, idx} ->
+        IO.puts("  #{idx}. #{cmd}")
+      end)
+    end
+  end
+
+  defp search_history(pattern) do
+    results = MultiAgentCoder.CLI.History.search(pattern)
+
+    if Enum.empty?(results) do
+      IO.puts("No commands found matching '#{pattern}'")
+    else
+      IO.puts([
+        IO.ANSI.cyan(),
+        "Commands matching '#{pattern}':",
+        IO.ANSI.reset()
+      ])
+
+      results
+      |> Enum.with_index(1)
+      |> Enum.each(fn {cmd, idx} ->
+        IO.puts("  #{idx}. #{cmd}")
+      end)
+    end
   end
 
   defp get_default_providers do
