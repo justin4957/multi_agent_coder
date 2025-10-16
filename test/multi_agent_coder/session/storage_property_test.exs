@@ -5,25 +5,11 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
   alias MultiAgentCoder.Session.Storage
 
   setup do
-    # Stop existing Storage if running
-    case Process.whereis(Storage) do
-      nil -> :ok
-      pid -> GenServer.stop(pid)
+    # Start the storage if not already started (same approach as storage_test.exs)
+    case GenServer.whereis(Storage) do
+      nil -> {:ok, _} = start_supervised(Storage)
+      _pid -> :ok
     end
-
-    # Start Storage with unique directory for each test
-    test_dir = "/tmp/mac_storage_test_#{:rand.uniform(1_000_000)}"
-
-    # Handle both successful start and already_started cases
-    case start_supervised({Storage, storage_dir: test_dir}) do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
-    end
-
-    on_exit(fn ->
-      File.rm_rf(test_dir)
-      # Don't call stop_supervised here - it will be cleaned up automatically
-    end)
 
     :ok
   end
