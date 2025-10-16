@@ -38,7 +38,13 @@ defmodule MultiAgentCoder.Application do
       MultiAgentCoder.Router.TaskRouter,
 
       # Real-time monitor - streams progress updates
-      MultiAgentCoder.Monitor.Realtime
+      MultiAgentCoder.Monitor.Realtime,
+
+      # File operations tracking system
+      MultiAgentCoder.FileOps.Ownership,
+      MultiAgentCoder.FileOps.History,
+      MultiAgentCoder.FileOps.ConflictDetector,
+      MultiAgentCoder.FileOps.Tracker
     ]
 
     opts = [strategy: :one_for_one, name: MultiAgentCoder.Supervisor]
