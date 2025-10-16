@@ -413,7 +413,7 @@ defmodule MultiAgentCoder.Monitor.Dashboard do
   end
 
   defp render_provider_panel(provider, provider_state) do
-    {status_text, status_color} = format_status(provider_state.status)
+    {status_text, status_color} = format_provider_status(provider_state.status)
     provider_name = provider |> to_string() |> String.capitalize()
 
     # Panel header
@@ -475,7 +475,7 @@ defmodule MultiAgentCoder.Monitor.Dashboard do
   end
 
   defp render_provider_compact(provider, provider_state) do
-    {status_text, status_color} = format_status(provider_state.status)
+    {status_text, status_color} = format_provider_status(provider_state.status)
     provider_name = provider |> to_string() |> String.capitalize()
     progress_bar = ProgressCalculator.format_progress_bar(provider_state.progress_percentage, 10)
 
@@ -489,7 +489,7 @@ defmodule MultiAgentCoder.Monitor.Dashboard do
   end
 
   defp render_provider_minimal(provider, provider_state) do
-    {_status_text, status_color} = format_status(provider_state.status)
+    {_status_text, status_color} = format_provider_status(provider_state.status)
     provider_name = provider |> to_string() |> String.capitalize()
 
     [
@@ -599,10 +599,10 @@ defmodule MultiAgentCoder.Monitor.Dashboard do
     }
   end
 
-  defp format_status(:idle), do: {"○ IDLE", IO.ANSI.cyan()}
-  defp format_status(:active), do: {"⚡ ACTIVE", IO.ANSI.yellow()}
-  defp format_status(:completed), do: {"✓ COMPLETED", IO.ANSI.green()}
-  defp format_status(:error), do: {"✗ ERROR", IO.ANSI.red()}
+  defp format_provider_status(:idle), do: {"○ IDLE", IO.ANSI.cyan()}
+  defp format_provider_status(:active), do: {"⚡ ACTIVE", IO.ANSI.yellow()}
+  defp format_provider_status(:completed), do: {"✓ COMPLETED", IO.ANSI.green()}
+  defp format_provider_status(:error), do: {"✗ ERROR", IO.ANSI.red()}
 
   defp elapsed_time_ms(nil), do: 0
 
