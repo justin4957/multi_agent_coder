@@ -25,10 +25,14 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Session creation properties" do
     property "creates sessions with unique IDs" do
-      check all metadata <- fixed_map(%{
-                  tags: list_of(string(:alphanumeric, min_length: 1, max_length: 10), max_length: 3)
+      check all(
+              metadata <-
+                fixed_map(%{
+                  tags:
+                    list_of(string(:alphanumeric, min_length: 1, max_length: 10), max_length: 3)
                 }),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         {:ok, id1} = Storage.create_session(metadata)
         {:ok, id2} = Storage.create_session(metadata)
 
@@ -39,8 +43,11 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "created sessions can be retrieved" do
-      check all tags <- list_of(string(:alphanumeric, min_length: 1, max_length: 10), max_length: 3),
-                max_runs: 20 do
+      check all(
+              tags <-
+                list_of(string(:alphanumeric, min_length: 1, max_length: 10), max_length: 3),
+              max_runs: 20
+            ) do
         metadata = %{tags: tags}
         {:ok, session_id} = Storage.create_session(metadata)
 
@@ -51,8 +58,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "new sessions start with empty messages" do
-      check all metadata <- fixed_map(%{}),
-                max_runs: 20 do
+      check all(
+              metadata <- fixed_map(%{}),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(metadata)
         {:ok, session} = Storage.get_session(session_id)
 
@@ -61,8 +70,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "new sessions have zero token count" do
-      check all metadata <- fixed_map(%{}),
-                max_runs: 20 do
+      check all(
+              metadata <- fixed_map(%{}),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(metadata)
         {:ok, session} = Storage.get_session(session_id)
 
@@ -74,10 +85,12 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Message addition properties" do
     property "adding messages increases message count" do
-      check all role <- member_of(["user", "assistant"]),
-                content <- string(:ascii, min_length: 1, max_length: 200),
-                provider <- member_of([:openai, :anthropic, :deepseek]),
-                max_runs: 20 do
+      check all(
+              role <- member_of(["user", "assistant"]),
+              content <- string(:ascii, min_length: 1, max_length: 200),
+              provider <- member_of([:openai, :anthropic, :deepseek]),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(%{})
         {:ok, session_before} = Storage.get_session(session_id)
 
@@ -96,17 +109,19 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "adding messages accumulates tokens" do
-      check all messages <-
-                  list_of(
-                    tuple({
-                      member_of(["user", "assistant"]),
-                      string(:ascii, min_length: 1, max_length: 100),
-                      integer(1..100)
-                    }),
-                    min_length: 1,
-                    max_length: 5
-                  ),
-                max_runs: 20 do
+      check all(
+              messages <-
+                list_of(
+                  tuple({
+                    member_of(["user", "assistant"]),
+                    string(:ascii, min_length: 1, max_length: 100),
+                    integer(1..100)
+                  }),
+                  min_length: 1,
+                  max_length: 5
+                ),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(%{})
 
         total_tokens =
@@ -127,11 +142,13 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "messages preserve content and metadata" do
-      check all role <- member_of(["user", "assistant"]),
-                content <- string(:ascii, min_length: 1, max_length: 200),
-                provider <- member_of([:openai, :anthropic, :deepseek]),
-                tokens <- integer(1..1000),
-                max_runs: 20 do
+      check all(
+              role <- member_of(["user", "assistant"]),
+              content <- string(:ascii, min_length: 1, max_length: 200),
+              provider <- member_of([:openai, :anthropic, :deepseek]),
+              tokens <- integer(1..1000),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(%{})
 
         message_params = %{
@@ -158,8 +175,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Session forking properties" do
     property "forked sessions have different IDs" do
-      check all content <- string(:ascii, min_length: 1, max_length: 100),
-                max_runs: 20 do
+      check all(
+              content <- string(:ascii, min_length: 1, max_length: 100),
+              max_runs: 20
+            ) do
         {:ok, parent_id} = Storage.create_session(%{})
         Storage.add_message(parent_id, %{role: "user", content: content, provider: :openai})
 
@@ -170,13 +189,18 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "forked sessions copy messages" do
-      check all messages <-
-                  list_of(
-                    tuple({member_of(["user", "assistant"]), string(:ascii, min_length: 1, max_length: 50)}),
-                    min_length: 1,
-                    max_length: 3
+      check all(
+              messages <-
+                list_of(
+                  tuple(
+                    {member_of(["user", "assistant"]),
+                     string(:ascii, min_length: 1, max_length: 50)}
                   ),
-                max_runs: 20 do
+                  min_length: 1,
+                  max_length: 3
+                ),
+              max_runs: 20
+            ) do
         {:ok, parent_id} = Storage.create_session(%{})
 
         Enum.each(messages, fn {role, content} ->
@@ -193,8 +217,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "can retrieve parent from fork" do
-      check all content <- string(:ascii, min_length: 1, max_length: 100),
-                max_runs: 20 do
+      check all(
+              content <- string(:ascii, min_length: 1, max_length: 100),
+              max_runs: 20
+            ) do
         {:ok, parent_id} = Storage.create_session(%{})
         Storage.add_message(parent_id, %{role: "user", content: content, provider: :openai})
 
@@ -206,8 +232,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "can retrieve forks from parent" do
-      check all fork_count <- integer(1..5),
-                max_runs: 20 do
+      check all(
+              fork_count <- integer(1..5),
+              max_runs: 20
+            ) do
         {:ok, parent_id} = Storage.create_session(%{})
 
         fork_ids =
@@ -226,8 +254,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Session listing and search properties" do
     property "listed sessions include all created sessions" do
-      check all session_count <- integer(1..5),
-                max_runs: 20 do
+      check all(
+              session_count <- integer(1..5),
+              max_runs: 20
+            ) do
         created_ids =
           Enum.map(1..session_count, fn i ->
             {:ok, id} = Storage.create_session(%{index: i})
@@ -244,8 +274,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "sessions can be found by tags" do
-      check all tag <- string(:alphanumeric, min_length: 1, max_length: 10),
-                max_runs: 20 do
+      check all(
+              tag <- string(:alphanumeric, min_length: 1, max_length: 10),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(%{tags: [tag]})
         {:ok, found_sessions} = Storage.find_sessions_by_tag(tag)
 
@@ -257,8 +289,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Session deletion properties" do
     property "deleted sessions cannot be retrieved" do
-      check all content <- string(:ascii, min_length: 1, max_length: 100),
-                max_runs: 20 do
+      check all(
+              content <- string(:ascii, min_length: 1, max_length: 100),
+              max_runs: 20
+            ) do
         {:ok, session_id} = Storage.create_session(%{})
         Storage.add_message(session_id, %{role: "user", content: content, provider: :openai})
 
@@ -271,8 +305,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
     end
 
     property "deleting with forks removes all" do
-      check all fork_count <- integer(1..3),
-                max_runs: 20 do
+      check all(
+              fork_count <- integer(1..3),
+              max_runs: 20
+            ) do
         {:ok, parent_id} = Storage.create_session(%{})
 
         fork_ids =
@@ -295,8 +331,10 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
   describe "Storage statistics properties" do
     property "stats reflect actual session count" do
-      check all session_count <- integer(0..10),
-                max_runs: 20 do
+      check all(
+              session_count <- integer(0..10),
+              max_runs: 20
+            ) do
         # Note: Other tests may have created sessions, so we just check
         # that adding sessions increases the count
         stats_before = Storage.get_stats()

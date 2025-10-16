@@ -12,9 +12,11 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
 
   describe "Queue enqueue/dequeue properties" do
     property "enqueued tasks can be dequeued" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                priority <- member_of([:low, :medium, :high, :urgent]),
-                max_runs: 20 do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              priority <- member_of([:low, :medium, :high, :urgent]),
+              max_runs: 20
+            ) do
         task = Task.new(description, priority: priority)
         :ok = Queue.enqueue(task)
 
@@ -27,11 +29,14 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     end
 
     property "queue size increases with enqueue" do
-      check all descriptions <- list_of(string(:ascii, min_length: 1, max_length: 50),
+      check all(
+              descriptions <-
+                list_of(string(:ascii, min_length: 1, max_length: 50),
                   min_length: 1,
                   max_length: 5
                 ),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         # Clear queue
         Queue.clear()
 
@@ -50,11 +55,14 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     end
 
     property "dequeue reduces queue size" do
-      check all descriptions <- list_of(string(:ascii, min_length: 1, max_length: 50),
+      check all(
+              descriptions <-
+                list_of(string(:ascii, min_length: 1, max_length: 50),
                   min_length: 2,
                   max_length: 5
                 ),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Enqueue all tasks
@@ -73,9 +81,11 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
 
   describe "Priority ordering properties" do
     property "urgent tasks are dequeued before high priority" do
-      check all urgent_desc <- string(:ascii, min_length: 1, max_length: 50),
-                high_desc <- string(:ascii, min_length: 1, max_length: 50),
-                max_runs: 20 do
+      check all(
+              urgent_desc <- string(:ascii, min_length: 1, max_length: 50),
+              high_desc <- string(:ascii, min_length: 1, max_length: 50),
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Enqueue high priority first
@@ -94,9 +104,11 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     end
 
     property "higher priority tasks available sooner" do
-      check all high_desc <- string(:ascii, min_length: 1, max_length: 50),
-                low_desc <- string(:ascii, min_length: 1, max_length: 50),
-                max_runs: 20 do
+      check all(
+              high_desc <- string(:ascii, min_length: 1, max_length: 50),
+              low_desc <- string(:ascii, min_length: 1, max_length: 50),
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Enqueue low priority first, then high
@@ -123,9 +135,11 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
 
   describe "Task completion properties" do
     property "completing task updates queue status" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                result <- string(:ascii, min_length: 1, max_length: 200),
-                max_runs: 20 do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              result <- string(:ascii, min_length: 1, max_length: 200),
+              max_runs: 20
+            ) do
         Queue.clear()
 
         task = Task.new(description)
@@ -147,9 +161,11 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     end
 
     property "failed tasks are tracked separately" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                reason <- string(:ascii, min_length: 1, max_length: 100),
-                max_runs: 20 do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              reason <- string(:ascii, min_length: 1, max_length: 100),
+              max_runs: 20
+            ) do
         Queue.clear()
 
         task = Task.new(description)
@@ -171,11 +187,14 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
 
   describe "Queue invariants" do
     property "total equals sum of all states" do
-      check all descriptions <- list_of(string(:ascii, min_length: 1, max_length: 50),
+      check all(
+              descriptions <-
+                list_of(string(:ascii, min_length: 1, max_length: 50),
                   min_length: 1,
                   max_length: 10
                 ),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Enqueue tasks
@@ -184,7 +203,9 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
         end)
 
         status = Queue.status()
-        sum = status.pending + status.running + status.completed + status.failed + status.cancelled
+
+        sum =
+          status.pending + status.running + status.completed + status.failed + status.cancelled
 
         assert status.total == sum
       end
@@ -196,11 +217,14 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     end
 
     property "enqueue and dequeue preserve task identity" do
-      check all descriptions <- list_of(string(:ascii, min_length: 1, max_length: 50),
+      check all(
+              descriptions <-
+                list_of(string(:ascii, min_length: 1, max_length: 50),
                   min_length: 2,
                   max_length: 5
                 ),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Enqueue all with same priority
@@ -228,11 +252,14 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
 
   describe "Clear operation properties" do
     property "clear removes all tasks" do
-      check all descriptions <- list_of(string(:ascii, min_length: 1, max_length: 50),
+      check all(
+              descriptions <-
+                list_of(string(:ascii, min_length: 1, max_length: 50),
                   min_length: 1,
                   max_length: 10
                 ),
-                max_runs: 20 do
+              max_runs: 20
+            ) do
         Queue.clear()
 
         # Add tasks

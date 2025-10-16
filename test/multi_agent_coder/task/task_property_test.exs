@@ -6,8 +6,10 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task.new/1 properties" do
     property "always generates unique IDs" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                max_runs: 50 do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              max_runs: 50
+            ) do
         task1 = Task.new(description)
         task2 = Task.new(description)
 
@@ -18,21 +20,21 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
     end
 
     property "preserves description" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
         assert task.description == description
       end
     end
 
     property "creates tasks in pending state" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
         assert task.status == :pending
       end
     end
 
     property "sets default priority to medium" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
         assert task.priority == :medium
       end
@@ -41,8 +43,10 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task.new/2 with priority" do
     property "accepts all valid priorities" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                priority <- member_of([:low, :medium, :high, :urgent]) do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              priority <- member_of([:low, :medium, :high, :urgent])
+            ) do
         task = Task.new(description, priority: priority)
         assert task.priority == priority
       end
@@ -51,11 +55,14 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task.assign_to/2 properties" do
     property "assigns providers correctly" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                providers <- list_of(member_of([:openai, :anthropic, :deepseek, :perplexity, :local]),
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              providers <-
+                list_of(member_of([:openai, :anthropic, :deepseek, :perplexity, :local]),
                   min_length: 1,
                   max_length: 5
-                ) do
+                )
+            ) do
         task = Task.new(description)
         assigned_task = Task.assign_to(task, providers)
 
@@ -68,7 +75,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task state transitions" do
     property "can transition from pending to running" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
         running_task = Task.start(task)
 
@@ -78,8 +85,10 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
     end
 
     property "can transition from running to completed" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                result <- string(:ascii, min_length: 1, max_length: 500) do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              result <- string(:ascii, min_length: 1, max_length: 500)
+            ) do
         task =
           Task.new(description)
           |> Task.start()
@@ -92,8 +101,10 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
     end
 
     property "can transition from running to failed" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100),
-                reason <- string(:ascii, min_length: 1, max_length: 200) do
+      check all(
+              description <- string(:ascii, min_length: 1, max_length: 100),
+              reason <- string(:ascii, min_length: 1, max_length: 200)
+            ) do
         task =
           Task.new(description)
           |> Task.start()
@@ -106,7 +117,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
     end
 
     property "elapsed time is always non-negative" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description) |> Task.start()
         elapsed = Task.elapsed_time(task)
 
@@ -118,7 +129,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task cancellation properties" do
     property "can cancel pending tasks" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
         cancelled_task = Task.cancel(task)
 
@@ -128,7 +139,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
     end
 
     property "can cancel running tasks" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task =
           Task.new(description)
           |> Task.start()
@@ -141,7 +152,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
 
   describe "Task immutability properties" do
     property "task operations return new structs" do
-      check all description <- string(:ascii, min_length: 1, max_length: 100) do
+      check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         original = Task.new(description)
         modified = Task.start(original)
 
