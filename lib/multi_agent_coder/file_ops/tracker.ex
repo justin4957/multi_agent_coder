@@ -347,7 +347,11 @@ defmodule MultiAgentCoder.FileOps.Tracker do
     Ownership.reset()
     History.reset()
     ConflictDetector.reset()
-    FileTracker.reset()
+
+    # Reset FileTracker only if it's running
+    if Process.whereis(FileTracker) do
+      FileTracker.reset()
+    end
 
     new_state = %__MODULE__{
       file_statuses: %{},

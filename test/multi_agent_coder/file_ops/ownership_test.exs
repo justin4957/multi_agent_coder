@@ -4,7 +4,8 @@ defmodule MultiAgentCoder.FileOps.OwnershipTest do
   alias MultiAgentCoder.FileOps.Ownership
 
   setup do
-    {:ok, _pid} = start_supervised(Ownership)
+    # Reset state before each test
+    # Module is already started by application supervision tree
     Ownership.reset()
     :ok
   end

@@ -4,13 +4,8 @@ defmodule MultiAgentCoder.FileOps.TrackerTest do
   alias MultiAgentCoder.FileOps.Tracker
 
   setup do
-    # Start all required services
-    {:ok, _} = start_supervised(MultiAgentCoder.FileOps.Ownership)
-    {:ok, _} = start_supervised(MultiAgentCoder.FileOps.History)
-    {:ok, _} = start_supervised(MultiAgentCoder.FileOps.ConflictDetector)
-    {:ok, _} = start_supervised(MultiAgentCoder.Monitor.FileTracker)
-    {:ok, _} = start_supervised(Tracker)
-
+    # Reset state before each test
+    # Modules are already started by application supervision tree
     Tracker.reset()
     :ok
   end

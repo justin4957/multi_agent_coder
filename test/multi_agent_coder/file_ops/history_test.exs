@@ -4,7 +4,8 @@ defmodule MultiAgentCoder.FileOps.HistoryTest do
   alias MultiAgentCoder.FileOps.History
 
   setup do
-    {:ok, _pid} = start_supervised(History)
+    # Reset state before each test
+    # Module is already started by application supervision tree
     History.reset()
     :ok
   end
