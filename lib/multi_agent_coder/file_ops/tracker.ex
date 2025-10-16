@@ -279,7 +279,7 @@ defmodule MultiAgentCoder.FileOps.Tracker do
         {:reply, :ok, new_state}
 
       {:conflict, conflict} ->
-        Logger.warn("Operation blocked due to conflict: #{inspect(conflict)}")
+        Logger.warning("Operation blocked due to conflict: #{inspect(conflict)}")
         {:reply, {:error, {:conflict, conflict}}, state}
     end
   end
@@ -327,9 +327,6 @@ defmodule MultiAgentCoder.FileOps.Tracker do
 
   @impl true
   def handle_call(:get_stats, _from, state) do
-    ownership_stats = Ownership.get_stats()
-  rescue
-    %{}
     history_stats = History.get_stats()
     conflict_stats = ConflictDetector.get_stats()
 
@@ -337,7 +334,6 @@ defmodule MultiAgentCoder.FileOps.Tracker do
       total_files: map_size(state.file_statuses),
       files_by_status: count_by_status(state.file_statuses),
       active_providers: map_size(state.provider_activity),
-      ownership: ownership_stats,
       history: history_stats,
       conflicts: conflict_stats
     }

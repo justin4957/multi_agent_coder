@@ -81,7 +81,7 @@ defmodule MultiAgentCoder.FileOps.Diff do
   Returns the new content that results from applying the diff.
   """
   @spec apply_diff(String.t() | nil, list(line_change())) :: String.t()
-  def apply_diff(old_content, changes) do
+  def apply_diff(_old_content, changes) do
     changes
     |> Enum.map(fn
       {:add, _, line} -> line
@@ -164,7 +164,7 @@ defmodule MultiAgentCoder.FileOps.Diff do
     end
   end
 
-  defp changes_block(changes, context, color?) do
+  defp changes_block(changes, _context, color?) do
     changes
     |> Enum.map(&format_change(&1, color?))
     |> Enum.join("\n")

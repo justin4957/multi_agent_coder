@@ -224,7 +224,7 @@ defmodule MultiAgentCoder.FileOps.ConflictDetector do
     case result do
       {:conflict, conflict} ->
         new_conflicts = [conflict | state.conflicts]
-        Logger.warn("Conflict detected: #{inspect(conflict)}")
+        Logger.warning("Conflict detected: #{inspect(conflict)}")
         {:reply, result, %{state | conflicts: new_conflicts}}
 
       :ok ->
