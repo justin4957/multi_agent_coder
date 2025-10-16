@@ -29,7 +29,7 @@ defmodule MultiAgentCoder.CLI.REPL do
   Type a partial command and see available completions displayed below the prompt.
   """
 
-  alias MultiAgentCoder.CLI.{History, Completion, Formatter}
+  alias MultiAgentCoder.CLI.{Completion, Formatter, History}
 
   @prompt "> "
   @continuation_prompt "... "

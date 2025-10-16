@@ -15,7 +15,7 @@ defmodule MultiAgentCoder.Session.Storage do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.Session.Storage.{Session, Message}
+  alias MultiAgentCoder.Session.Storage.{Message, Session}
 
   defstruct [
     # Main session storage

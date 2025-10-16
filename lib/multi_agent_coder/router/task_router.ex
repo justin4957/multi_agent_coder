@@ -13,6 +13,8 @@ defmodule MultiAgentCoder.Router.TaskRouter do
   use GenServer
   require Logger
 
+  alias MultiAgentCoder.Agent.Worker
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -63,7 +65,7 @@ defmodule MultiAgentCoder.Router.TaskRouter do
     tasks =
       Enum.map(providers, fn provider ->
         Task.async(fn ->
-          {provider, MultiAgentCoder.Agent.Worker.execute_task(provider, prompt, context)}
+          {provider, Worker.execute_task(provider, prompt, context)}
         end)
       end)
 
@@ -85,7 +87,7 @@ defmodule MultiAgentCoder.Router.TaskRouter do
       enhanced_context = Map.put(context, :previous_results, acc)
 
       Logger.info("Sequential routing to #{provider}")
-      result = MultiAgentCoder.Agent.Worker.execute_task(provider, prompt, enhanced_context)
+      result = Worker.execute_task(provider, prompt, enhanced_context)
       Map.put(acc, provider, result)
     end)
   end
@@ -151,7 +153,7 @@ defmodule MultiAgentCoder.Router.TaskRouter do
     tasks =
       Enum.map(providers, fn provider ->
         Task.async(fn ->
-          {provider, MultiAgentCoder.Agent.Worker.execute_task(provider, prompt, context)}
+          {provider, Worker.execute_task(provider, prompt, context)}
         end)
       end)
 

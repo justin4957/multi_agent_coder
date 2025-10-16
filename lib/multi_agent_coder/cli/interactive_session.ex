@@ -30,7 +30,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   require Logger
 
   alias MultiAgentCoder.Agent.Worker
-  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
+  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, History, REPL}
   alias MultiAgentCoder.Task.{Allocator, Queue, Tracker}
   alias MultiAgentCoder.Task.Task, as: CodingTask
 
@@ -79,7 +79,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     case REPL.read_input() do
       {:ok, command} ->
         # Save to history
-        MultiAgentCoder.CLI.History.append(command)
+        History.append(command)
 
         # Process command
         process_repl_command(command, state)
@@ -114,7 +114,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         interactive_loop(state)
 
       {:history, :clear} ->
-        MultiAgentCoder.CLI.History.clear()
+        History.clear()
         IO.puts("History cleared.")
         interactive_loop(state)
 
@@ -357,7 +357,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp display_history do
-    history = MultiAgentCoder.CLI.History.last(20)
+    history = History.last(20)
 
     if Enum.empty?(history) do
       IO.puts("No command history.")
@@ -373,7 +373,7 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp search_history(pattern) do
-    results = MultiAgentCoder.CLI.History.search(pattern)
+    results = History.search(pattern)
 
     if Enum.empty?(results) do
       IO.puts("No commands found matching '#{pattern}'")

@@ -15,7 +15,7 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
+  alias MultiAgentCoder.Agent.{ContextFormatter, HTTPClient, Streaming, TokenCounter}
 
   @api_base "https://api.deepseek.com/v1"
 
@@ -198,26 +198,24 @@ defmodule MultiAgentCoder.Agent.DeepSeek do
     body
     |> String.split("\n")
     |> Enum.reduce(accumulated, fn line, acc ->
-      case Streaming.parse_sse_line(line) do
-        {:ok, data} ->
-          # Extract content delta from OpenAI-compatible format
-          delta = get_in(data, ["choices", Access.at(0), "delta", "content"])
-
-          if delta do
-            Streaming.broadcast_chunk(provider, delta)
-            acc <> delta
-          else
-            acc
-          end
-
-        :done ->
-          acc
-
-        :skip ->
-          acc
-      end
+      process_sse_line(Streaming.parse_sse_line(line), provider, acc)
     end)
   end
+
+  defp process_sse_line({:ok, data}, provider, acc) do
+    # Extract content delta from OpenAI-compatible format
+    case get_in(data, ["choices", Access.at(0), "delta", "content"]) do
+      nil ->
+        acc
+
+      delta ->
+        Streaming.broadcast_chunk(provider, delta)
+        acc <> delta
+    end
+  end
+
+  defp process_sse_line(:done, _provider, acc), do: acc
+  defp process_sse_line(:skip, _provider, acc), do: acc
 
   defp extract_response(body, state, original_prompt) do
     with {:ok, content} <- extract_content(body),
