@@ -23,8 +23,14 @@ defmodule MultiAgentCoder.MixProject do
       source_url: "https://github.com/justin4957/multi_agent_coder",
       homepage_url: "https://github.com/justin4957/multi_agent_coder",
       docs: [
-        main: "readme",
-        extras: ["README.md"],
+        main: "quickstart",
+        extras: [
+          "guides/quickstart.md",
+          "README.md"
+        ],
+        groups_for_extras: [
+          Guides: ~r/guides\/.?/
+        ],
         groups_for_modules: [
           "Agent Providers": [
             MultiAgentCoder.Agent.Worker,
@@ -49,11 +55,25 @@ defmodule MultiAgentCoder.MixProject do
           ],
           "CLI Interface": [
             MultiAgentCoder.CLI.Command,
+            MultiAgentCoder.CLI.InteractiveSession,
             MultiAgentCoder.CLI.Formatter,
-            MultiAgentCoder.CLI.ConfigSetup
+            MultiAgentCoder.CLI.ConfigSetup,
+            MultiAgentCoder.CLI.REPL,
+            MultiAgentCoder.CLI.History,
+            MultiAgentCoder.CLI.Completion,
+            MultiAgentCoder.CLI.ConcurrentDisplay,
+            MultiAgentCoder.CLI.DisplayConfig
+          ],
+          "Task Management": [
+            MultiAgentCoder.Task.Task,
+            MultiAgentCoder.Task.Queue,
+            MultiAgentCoder.Task.Allocator,
+            MultiAgentCoder.Task.Tracker
           ],
           Monitoring: [
-            MultiAgentCoder.Monitor.Realtime
+            MultiAgentCoder.Monitor.Realtime,
+            MultiAgentCoder.Monitor.Collector,
+            MultiAgentCoder.Monitor.Streaming
           ]
         ]
       ],
