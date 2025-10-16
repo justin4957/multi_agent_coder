@@ -29,8 +29,10 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
   require Logger
 
-  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
   alias MultiAgentCoder.Agent.Worker
+  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
+  alias MultiAgentCoder.Task.{Allocator, Queue, Tracker}
+  alias MultiAgentCoder.Task.Task, as: CodingTask
 
   @doc """
   Starts an interactive session with specified providers.
@@ -52,6 +54,9 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     IO.puts("  accept <n>         - Accept response from provider N")
     IO.puts("  compare            - Show side-by-side comparison of all responses")
     IO.puts("  save <name>        - Save current session")
+    IO.puts("  task queue <desc>  - Add task to allocation queue")
+    IO.puts("  task list          - Show all queued tasks")
+    IO.puts("  task status        - Show queue statistics")
     IO.puts("  help               - Show this help")
     IO.puts("  exit               - Exit interactive mode")
     IO.puts(Formatter.format_separator())
@@ -129,6 +134,26 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         handle_save(state, session_name)
         interactive_loop(state)
 
+      {:task, :list} ->
+        handle_task_list()
+        interactive_loop(state)
+
+      {:task, :status} ->
+        handle_task_status()
+        interactive_loop(state)
+
+      {:task, {:queue, description}} ->
+        handle_task_queue(description, state)
+        interactive_loop(state)
+
+      {:task, {:cancel, task_id}} ->
+        handle_task_cancel(task_id)
+        interactive_loop(state)
+
+      {:task, :track} ->
+        handle_task_track()
+        interactive_loop(state)
+
       {:query, question} ->
         new_state = handle_query(state, question)
         interactive_loop(new_state)
@@ -160,6 +185,18 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp parse_command("save " <> name), do: {:save, name}
+
+  defp parse_command("task list"), do: {:task, :list}
+  defp parse_command("task status"), do: {:task, :status}
+  defp parse_command("task track"), do: {:task, :track}
+
+  defp parse_command("task queue " <> description) do
+    {:task, {:queue, description}}
+  end
+
+  defp parse_command("task cancel " <> task_id) do
+    {:task, {:cancel, task_id}}
+  end
 
   defp parse_command(question) when byte_size(question) > 0 do
     {:query, question}
@@ -290,6 +327,13 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       help, ?            - Show this help message
       exit, quit, q      - Exit interactive mode
 
+    Task Allocation Commands:
+      task queue <desc>  - Add a task to the allocation queue with auto-routing
+      task list          - Show all tasks (pending, running, completed, failed)
+      task status        - Show queue statistics and summary
+      task track         - Show detailed tracking info for active tasks
+      task cancel <id>   - Cancel a queued or running task by ID
+
     Multi-line Input:
       Use \\ at end of line to continue on next line
       Unclosed quotes and brackets automatically continue to next line
@@ -299,6 +343,10 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       > accept 2
       > compare
       > save linkedlist-session
+
+      > task queue "Implement bubble sort algorithm"
+      > task list
+      > task status
 
       > Write a function to \\
       ... parse CSV files
@@ -340,6 +388,185 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       |> Enum.with_index(1)
       |> Enum.each(fn {cmd, idx} ->
         IO.puts("  #{idx}. #{cmd}")
+      end)
+    end
+  end
+
+  defp handle_task_queue(description, state) do
+    # Create a new task
+    task = CodingTask.new(description)
+
+    # Auto-allocate to best providers
+    {:ok, suggested_providers} = Allocator.auto_allocate(task)
+
+    # Filter to only active session providers
+    available_providers =
+      Enum.filter(suggested_providers, &(&1 in state.providers))
+
+    # Assign task to provider(s)
+    assigned_task =
+      if Enum.empty?(available_providers) do
+        # Fall back to first available provider
+        CodingTask.assign_to(task, [List.first(state.providers)])
+      else
+        CodingTask.assign_to(task, available_providers)
+      end
+
+    # Enqueue the task
+    Queue.enqueue(assigned_task)
+
+    IO.puts([
+      IO.ANSI.green(),
+      "✓ Task queued: #{task.id}",
+      IO.ANSI.reset()
+    ])
+
+    IO.puts("  Description: #{description}")
+
+    IO.puts("  Assigned to: #{Enum.map_join(assigned_task.assigned_to, ", ", &to_string/1)}")
+
+    IO.puts("  Priority: #{task.priority}")
+  end
+
+  defp handle_task_list do
+    all_tasks = Queue.list_all()
+
+    IO.puts("\n#{Formatter.format_header("Task Queue")}")
+
+    if Enum.empty?(all_tasks.pending) and Enum.empty?(all_tasks.running) do
+      IO.puts("No tasks in queue.")
+    else
+      display_pending_tasks(all_tasks.pending)
+      display_running_tasks(all_tasks.running)
+    end
+
+    display_completed_count(all_tasks.completed)
+    display_failed_count(all_tasks.failed)
+  end
+
+  defp display_pending_tasks([]), do: :ok
+
+  defp display_pending_tasks(pending_tasks) do
+    IO.puts([IO.ANSI.cyan(), "\nPending Tasks:", IO.ANSI.reset()])
+
+    pending_tasks
+    |> Enum.with_index(1)
+    |> Enum.each(fn {task, idx} ->
+      providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
+      IO.puts("  #{idx}. [#{task.id}] #{task.description}")
+      IO.puts("     Priority: #{task.priority} | Assigned to: #{providers}")
+    end)
+  end
+
+  defp display_running_tasks(running_tasks) when map_size(running_tasks) == 0, do: :ok
+
+  defp display_running_tasks(running_tasks) do
+    IO.puts([IO.ANSI.yellow(), "\nRunning Tasks:", IO.ANSI.reset()])
+
+    running_tasks
+    |> Map.values()
+    |> Enum.with_index(1)
+    |> Enum.each(fn {task, idx} ->
+      providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
+      elapsed = CodingTask.elapsed_time(task) || 0
+      IO.puts("  #{idx}. [#{task.id}] #{task.description}")
+      IO.puts("     Elapsed: #{div(elapsed, 1000)}s | Assigned to: #{providers}")
+    end)
+  end
+
+  defp display_completed_count([]), do: :ok
+
+  defp display_completed_count(completed_tasks) do
+    IO.puts([
+      IO.ANSI.green(),
+      "\nCompleted: #{length(completed_tasks)}",
+      IO.ANSI.reset()
+    ])
+  end
+
+  defp display_failed_count([]), do: :ok
+
+  defp display_failed_count(failed_tasks) do
+    IO.puts([
+      IO.ANSI.red(),
+      "Failed: #{length(failed_tasks)}",
+      IO.ANSI.reset()
+    ])
+  end
+
+  defp handle_task_status do
+    status = Queue.status()
+
+    IO.puts("\n#{Formatter.format_header("Queue Status")}")
+    IO.puts("Pending:   #{status.pending}")
+    IO.puts("Running:   #{status.running}")
+    IO.puts("Completed: #{status.completed}")
+    IO.puts("Failed:    #{status.failed}")
+    IO.puts("Cancelled: #{status.cancelled}")
+    IO.puts("Total:     #{status.total}")
+  end
+
+  defp handle_task_cancel(task_id) do
+    case Queue.cancel_task(task_id) do
+      :ok ->
+        IO.puts([
+          IO.ANSI.yellow(),
+          "✓ Task cancelled: #{task_id}",
+          IO.ANSI.reset()
+        ])
+
+      {:error, :not_found} ->
+        IO.puts([IO.ANSI.red(), "Error: Task not found", IO.ANSI.reset()])
+    end
+  end
+
+  defp handle_task_track do
+    tracked_tasks = Tracker.get_all_tasks()
+
+    IO.puts("\n#{Formatter.format_header("Task Tracking")}")
+
+    display_tracked_tasks(tracked_tasks)
+    display_provider_stats()
+  end
+
+  defp display_tracked_tasks([]) do
+    IO.puts("No tasks currently being tracked.")
+  end
+
+  defp display_tracked_tasks(tracked_tasks) do
+    tracked_tasks
+    |> Enum.with_index(1)
+    |> Enum.each(fn {tracking, idx} ->
+      elapsed = DateTime.diff(DateTime.utc_now(), tracking.started_at, :millisecond)
+      eta = format_eta(tracking.estimated_completion)
+
+      IO.puts("#{idx}. [#{tracking.task_id}] #{tracking.provider}")
+      IO.puts("   Progress: #{Float.round(tracking.progress * 100, 1)}%")
+      IO.puts("   Elapsed: #{div(elapsed, 1000)}s")
+      IO.puts("   Tokens: #{tracking.tokens_used}")
+      IO.puts("   ETA: #{eta}s")
+    end)
+  end
+
+  defp format_eta(nil), do: "unknown"
+
+  defp format_eta(estimated_completion) do
+    DateTime.diff(estimated_completion, DateTime.utc_now(), :second)
+  end
+
+  defp display_provider_stats do
+    provider_stats = Tracker.get_all_provider_stats()
+
+    unless Enum.empty?(provider_stats) do
+      IO.puts([IO.ANSI.cyan(), "\nProvider Statistics:", IO.ANSI.reset()])
+
+      Enum.each(provider_stats, fn {provider, stats} ->
+        IO.puts("\n#{provider}:")
+        IO.puts("  Active: #{stats.active_tasks}")
+        IO.puts("  Completed: #{stats.completed_tasks}")
+        IO.puts("  Failed: #{stats.failed_tasks}")
+        IO.puts("  Tokens: #{stats.total_tokens}")
+        IO.puts("  Avg completion: #{Float.round(stats.average_completion_time / 1000, 1)}s")
       end)
     end
   end
