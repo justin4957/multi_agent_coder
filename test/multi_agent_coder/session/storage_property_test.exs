@@ -17,7 +17,7 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
     on_exit(fn ->
       File.rm_rf(test_dir)
-      stop_supervised(Storage)
+      # Don't call stop_supervised here - it will be cleaned up automatically
     end)
 
     :ok
