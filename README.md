@@ -1,4 +1,5 @@
 # MultiAgent Coder
+![](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXBxenlwbHF4cGMwbjc4NGE2bTNiaWIzODlhanYxamlnOTB1dWtjbSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/H7Fbn0QHGDWW4/giphy.gif)
 
 ![](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdmJ1cjY4MnVxbzZvZHR1ZWxxemEyZ3BrdHM2OTdhZW5lZzMwN3RmcyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/2UlsTILSK3axi/giphy.gif)
 
