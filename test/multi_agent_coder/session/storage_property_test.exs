@@ -13,7 +13,12 @@ defmodule MultiAgentCoder.Session.StoragePropertyTest do
 
     # Start Storage with unique directory for each test
     test_dir = "/tmp/mac_storage_test_#{:rand.uniform(1_000_000)}"
-    {:ok, _pid} = start_supervised({Storage, storage_dir: test_dir})
+
+    # Handle both successful start and already_started cases
+    case start_supervised({Storage, storage_dir: test_dir}) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
 
     on_exit(fn ->
       File.rm_rf(test_dir)

@@ -33,19 +33,19 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
       end
     end
 
-    property "sets default priority to medium" do
+    property "sets default priority to 5" do
       check all(description <- string(:ascii, min_length: 1, max_length: 100)) do
         task = Task.new(description)
-        assert task.priority == :medium
+        assert task.priority == 5
       end
     end
   end
 
   describe "Task.new/2 with priority" do
-    property "accepts all valid priorities" do
+    property "accepts valid integer priorities" do
       check all(
               description <- string(:ascii, min_length: 1, max_length: 100),
-              priority <- member_of([:low, :medium, :high, :urgent])
+              priority <- integer(1..10)
             ) do
         task = Task.new(description, priority: priority)
         assert task.priority == priority
@@ -111,7 +111,7 @@ defmodule MultiAgentCoder.Task.TaskPropertyTest do
           |> Task.fail(reason)
 
         assert task.status == :failed
-        assert task.result == {:error, reason}
+        assert task.error == reason
         assert task.completed_at != nil
       end
     end

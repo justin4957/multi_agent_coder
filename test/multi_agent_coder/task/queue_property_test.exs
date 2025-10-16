@@ -14,7 +14,7 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
     property "enqueued tasks can be dequeued" do
       check all(
               description <- string(:ascii, min_length: 1, max_length: 100),
-              priority <- member_of([:low, :medium, :high, :urgent]),
+              priority <- integer(1..10),
               max_runs: 20
             ) do
         task = Task.new(description, priority: priority)
@@ -80,30 +80,7 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
   end
 
   describe "Priority ordering properties" do
-    property "urgent tasks are dequeued before high priority" do
-      check all(
-              urgent_desc <- string(:ascii, min_length: 1, max_length: 50),
-              high_desc <- string(:ascii, min_length: 1, max_length: 50),
-              max_runs: 20
-            ) do
-        Queue.clear()
-
-        # Enqueue high priority first
-        high_task = Task.new(high_desc, priority: :high)
-        Queue.enqueue(high_task)
-
-        # Then enqueue urgent
-        urgent_task = Task.new(urgent_desc, priority: :urgent)
-        Queue.enqueue(urgent_task)
-
-        # Urgent should come out first
-        {:ok, first} = Queue.dequeue()
-        assert first.id == urgent_task.id
-        assert first.priority == :urgent
-      end
-    end
-
-    property "higher priority tasks available sooner" do
+    property "higher priority tasks are dequeued first" do
       check all(
               high_desc <- string(:ascii, min_length: 1, max_length: 50),
               low_desc <- string(:ascii, min_length: 1, max_length: 50),
@@ -111,24 +88,43 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
             ) do
         Queue.clear()
 
-        # Enqueue low priority first, then high
-        low_task = Task.new(low_desc, priority: :low)
-        high_task = Task.new(high_desc, priority: :high)
-
+        # Enqueue low priority (3) first
+        low_task = Task.new(low_desc, priority: 3)
         Queue.enqueue(low_task)
+
+        # Then enqueue high priority (8)
+        high_task = Task.new(high_desc, priority: 8)
         Queue.enqueue(high_task)
 
-        # Dequeue all tasks and collect them
+        # High priority should come out first
+        {:ok, first} = Queue.dequeue()
+        assert first.id == high_task.id
+        assert first.priority == 8
+      end
+    end
+
+    property "priority ordering is maintained" do
+      check all(
+              desc1 <- string(:ascii, min_length: 1, max_length: 50),
+              desc2 <- string(:ascii, min_length: 1, max_length: 50),
+              priority1 <- integer(1..10),
+              priority2 <- integer(1..10),
+              max_runs: 20
+            ) do
+        Queue.clear()
+
+        task1 = Task.new(desc1, priority: priority1)
+        task2 = Task.new(desc2, priority: priority2)
+
+        Queue.enqueue(task1)
+        Queue.enqueue(task2)
+
+        # Dequeue all tasks
         {:ok, first} = Queue.dequeue()
         {:ok, second} = Queue.dequeue()
 
-        priorities = [first.priority, second.priority]
-
-        # High priority should come before low (though exact order may vary)
-        high_index = Enum.find_index(priorities, &(&1 == :high))
-        low_index = Enum.find_index(priorities, &(&1 == :low))
-
-        assert high_index < low_index
+        # First task should have higher or equal priority
+        assert first.priority >= second.priority
       end
     end
   end
@@ -230,7 +226,7 @@ defmodule MultiAgentCoder.Task.QueuePropertyTest do
         # Enqueue all with same priority
         task_ids =
           Enum.map(descriptions, fn desc ->
-            task = Task.new(desc, priority: :medium)
+            task = Task.new(desc, priority: 5)
             Queue.enqueue(task)
             task.id
           end)
