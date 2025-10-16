@@ -6,9 +6,9 @@ defmodule MultiAgentCoder.CLI.Command do
   querying multiple AI agents concurrently.
   """
 
-  alias MultiAgentCoder.CLI.{Formatter, ConfigSetup, InteractiveSession}
-  alias MultiAgentCoder.Router.TaskRouter
+  alias MultiAgentCoder.CLI.{ConfigSetup, Formatter, InteractiveSession}
   alias MultiAgentCoder.Monitor.Realtime
+  alias MultiAgentCoder.Router.TaskRouter
 
   def main(args \\ []) do
     # Parse args first to check for setup command

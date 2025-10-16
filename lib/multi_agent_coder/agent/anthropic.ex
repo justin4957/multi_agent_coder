@@ -12,7 +12,7 @@ defmodule MultiAgentCoder.Agent.Anthropic do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter, Streaming}
+  alias MultiAgentCoder.Agent.{ContextFormatter, HTTPClient, Streaming, TokenCounter}
 
   @api_base "https://api.anthropic.com/v1"
   @api_version "2023-06-01"

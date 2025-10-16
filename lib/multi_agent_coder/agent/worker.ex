@@ -12,6 +12,8 @@ defmodule MultiAgentCoder.Agent.Worker do
   use GenServer
   require Logger
 
+  alias MultiAgentCoder.Agent.{Anthropic, DeepSeek, Local, OpenAI, Perplexity}
+
   defstruct [
     :provider,
     :model,
@@ -97,11 +99,11 @@ defmodule MultiAgentCoder.Agent.Worker do
     # Execute based on provider
     result =
       case state.provider do
-        :openai -> MultiAgentCoder.Agent.OpenAI.call(state, prompt, context)
-        :anthropic -> MultiAgentCoder.Agent.Anthropic.call(state, prompt, context)
-        :deepseek -> MultiAgentCoder.Agent.DeepSeek.call(state, prompt, context)
-        :perplexity -> MultiAgentCoder.Agent.Perplexity.call(state, prompt, context)
-        :local -> MultiAgentCoder.Agent.Local.call(state, prompt, context)
+        :openai -> OpenAI.call(state, prompt, context)
+        :anthropic -> Anthropic.call(state, prompt, context)
+        :deepseek -> DeepSeek.call(state, prompt, context)
+        :perplexity -> Perplexity.call(state, prompt, context)
+        :local -> Local.call(state, prompt, context)
       end
 
     final_state = %{new_state | status: :idle, current_task: nil}
@@ -125,12 +127,12 @@ defmodule MultiAgentCoder.Agent.Worker do
     # Execute with streaming based on provider
     result =
       case state.provider do
-        :openai -> MultiAgentCoder.Agent.OpenAI.call_streaming(state, prompt, context)
-        :anthropic -> MultiAgentCoder.Agent.Anthropic.call_streaming(state, prompt, context)
-        :deepseek -> MultiAgentCoder.Agent.DeepSeek.call_streaming(state, prompt, context)
-        :perplexity -> MultiAgentCoder.Agent.Perplexity.call_streaming(state, prompt, context)
+        :openai -> OpenAI.call_streaming(state, prompt, context)
+        :anthropic -> Anthropic.call_streaming(state, prompt, context)
+        :deepseek -> DeepSeek.call_streaming(state, prompt, context)
+        :perplexity -> Perplexity.call_streaming(state, prompt, context)
         # Local doesn't support streaming yet
-        :local -> MultiAgentCoder.Agent.Local.call(state, prompt, context)
+        :local -> Local.call(state, prompt, context)
       end
 
     final_state = %{new_state | status: :idle, current_task: nil}

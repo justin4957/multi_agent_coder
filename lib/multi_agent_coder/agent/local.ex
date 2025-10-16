@@ -13,7 +13,7 @@ defmodule MultiAgentCoder.Agent.Local do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.{HTTPClient, TokenCounter, ContextFormatter}
+  alias MultiAgentCoder.Agent.{ContextFormatter, HTTPClient, TokenCounter}
 
   @default_endpoint "http://localhost:11434"
 
