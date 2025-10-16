@@ -116,6 +116,8 @@ defmodule MultiAgentCoder.MixProject do
       {:progress_bar, "~> 3.0"},
       # Code coverage reporting
       {:excoveralls, "~> 0.18", only: :test},
+      # Property-based testing
+      {:stream_data, "~> 1.0", only: :test},
       # Documentation generation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       # Code quality and static analysis
