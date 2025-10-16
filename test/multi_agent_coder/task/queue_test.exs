@@ -1,7 +1,7 @@
 defmodule MultiAgentCoder.Task.QueueTest do
   use ExUnit.Case, async: false
 
-  alias MultiAgentCoder.Task.{Task, Queue}
+  alias MultiAgentCoder.Task.{Queue, Task}
 
   setup do
     # Start the Queue GenServer for each test
@@ -332,10 +332,10 @@ defmodule MultiAgentCoder.Task.QueueTest do
       all_tasks = Queue.list_all()
 
       assert length(all_tasks.pending) == 1
-      assert length(all_tasks.running) == 0
+      assert Enum.empty?(all_tasks.running)
       assert length(all_tasks.completed) == 1
-      assert length(all_tasks.failed) == 0
-      assert length(all_tasks.cancelled) == 0
+      assert Enum.empty?(all_tasks.failed)
+      assert Enum.empty?(all_tasks.cancelled)
     end
   end
 

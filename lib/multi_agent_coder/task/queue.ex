@@ -192,11 +192,7 @@ defmodule MultiAgentCoder.Task.Queue do
   def handle_call({:update_task, task_id, updated_task}, _from, state) do
     cond do
       Enum.any?(state.pending, &(&1.id == task_id)) ->
-        new_pending =
-          Enum.map(state.pending, fn t ->
-            if t.id == task_id, do: updated_task, else: t
-          end)
-
+        new_pending = update_task_in_list(state.pending, task_id, updated_task)
         {:reply, :ok, %{state | pending: new_pending}}
 
       Map.has_key?(state.running, task_id) ->
@@ -319,5 +315,11 @@ defmodule MultiAgentCoder.Task.Queue do
         remaining = Enum.reject(pending_tasks, &(&1.id == task.id))
         {task, remaining}
     end
+  end
+
+  defp update_task_in_list(task_list, task_id, updated_task) do
+    Enum.map(task_list, fn t ->
+      if t.id == task_id, do: updated_task, else: t
+    end)
   end
 end

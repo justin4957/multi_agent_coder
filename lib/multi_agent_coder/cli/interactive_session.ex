@@ -29,9 +29,9 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
   require Logger
 
-  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
   alias MultiAgentCoder.Agent.Worker
-  alias MultiAgentCoder.Task.{Queue, Allocator, Tracker}
+  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, REPL}
+  alias MultiAgentCoder.Task.{Allocator, Queue, Tracker}
   alias MultiAgentCoder.Task.Task, as: CodingTask
 
   @doc """
@@ -436,49 +436,62 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     if Enum.empty?(all_tasks.pending) and Enum.empty?(all_tasks.running) do
       IO.puts("No tasks in queue.")
     else
-      unless Enum.empty?(all_tasks.pending) do
-        IO.puts([IO.ANSI.cyan(), "\nPending Tasks:", IO.ANSI.reset()])
-
-        all_tasks.pending
-        |> Enum.with_index(1)
-        |> Enum.each(fn {task, idx} ->
-          providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
-          IO.puts("  #{idx}. [#{task.id}] #{task.description}")
-          IO.puts("     Priority: #{task.priority} | Assigned to: #{providers}")
-        end)
-      end
-
-      unless Enum.empty?(all_tasks.running) do
-        IO.puts([IO.ANSI.yellow(), "\nRunning Tasks:", IO.ANSI.reset()])
-
-        all_tasks.running
-        |> Map.values()
-        |> Enum.with_index(1)
-        |> Enum.each(fn {task, idx} ->
-          providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
-          elapsed = CodingTask.elapsed_time(task) || 0
-          IO.puts("  #{idx}. [#{task.id}] #{task.description}")
-
-          IO.puts("     Elapsed: #{div(elapsed, 1000)}s | Assigned to: #{providers}")
-        end)
-      end
+      display_pending_tasks(all_tasks.pending)
+      display_running_tasks(all_tasks.running)
     end
 
-    unless Enum.empty?(all_tasks.completed) do
-      IO.puts([
-        IO.ANSI.green(),
-        "\nCompleted: #{length(all_tasks.completed)}",
-        IO.ANSI.reset()
-      ])
-    end
+    display_completed_count(all_tasks.completed)
+    display_failed_count(all_tasks.failed)
+  end
 
-    unless Enum.empty?(all_tasks.failed) do
-      IO.puts([
-        IO.ANSI.red(),
-        "Failed: #{length(all_tasks.failed)}",
-        IO.ANSI.reset()
-      ])
-    end
+  defp display_pending_tasks([]), do: :ok
+
+  defp display_pending_tasks(pending_tasks) do
+    IO.puts([IO.ANSI.cyan(), "\nPending Tasks:", IO.ANSI.reset()])
+
+    pending_tasks
+    |> Enum.with_index(1)
+    |> Enum.each(fn {task, idx} ->
+      providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
+      IO.puts("  #{idx}. [#{task.id}] #{task.description}")
+      IO.puts("     Priority: #{task.priority} | Assigned to: #{providers}")
+    end)
+  end
+
+  defp display_running_tasks(running_tasks) when map_size(running_tasks) == 0, do: :ok
+
+  defp display_running_tasks(running_tasks) do
+    IO.puts([IO.ANSI.yellow(), "\nRunning Tasks:", IO.ANSI.reset()])
+
+    running_tasks
+    |> Map.values()
+    |> Enum.with_index(1)
+    |> Enum.each(fn {task, idx} ->
+      providers = Enum.map_join(task.assigned_to || [], ", ", &to_string/1)
+      elapsed = CodingTask.elapsed_time(task) || 0
+      IO.puts("  #{idx}. [#{task.id}] #{task.description}")
+      IO.puts("     Elapsed: #{div(elapsed, 1000)}s | Assigned to: #{providers}")
+    end)
+  end
+
+  defp display_completed_count([]), do: :ok
+
+  defp display_completed_count(completed_tasks) do
+    IO.puts([
+      IO.ANSI.green(),
+      "\nCompleted: #{length(completed_tasks)}",
+      IO.ANSI.reset()
+    ])
+  end
+
+  defp display_failed_count([]), do: :ok
+
+  defp display_failed_count(failed_tasks) do
+    IO.puts([
+      IO.ANSI.red(),
+      "Failed: #{length(failed_tasks)}",
+      IO.ANSI.reset()
+    ])
   end
 
   defp handle_task_status do
@@ -512,31 +525,36 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
     IO.puts("\n#{Formatter.format_header("Task Tracking")}")
 
-    if Enum.empty?(tracked_tasks) do
-      IO.puts("No tasks currently being tracked.")
-    else
-      tracked_tasks
-      |> Enum.with_index(1)
-      |> Enum.each(fn {tracking, idx} ->
-        elapsed =
-          DateTime.diff(DateTime.utc_now(), tracking.started_at, :millisecond)
+    display_tracked_tasks(tracked_tasks)
+    display_provider_stats()
+  end
 
-        eta =
-          if tracking.estimated_completion do
-            DateTime.diff(tracking.estimated_completion, DateTime.utc_now(), :second)
-          else
-            "unknown"
-          end
+  defp display_tracked_tasks([]) do
+    IO.puts("No tasks currently being tracked.")
+  end
 
-        IO.puts("#{idx}. [#{tracking.task_id}] #{tracking.provider}")
-        IO.puts("   Progress: #{Float.round(tracking.progress * 100, 1)}%")
-        IO.puts("   Elapsed: #{div(elapsed, 1000)}s")
-        IO.puts("   Tokens: #{tracking.tokens_used}")
-        IO.puts("   ETA: #{eta}s")
-      end)
-    end
+  defp display_tracked_tasks(tracked_tasks) do
+    tracked_tasks
+    |> Enum.with_index(1)
+    |> Enum.each(fn {tracking, idx} ->
+      elapsed = DateTime.diff(DateTime.utc_now(), tracking.started_at, :millisecond)
+      eta = format_eta(tracking.estimated_completion)
 
-    # Also show provider statistics
+      IO.puts("#{idx}. [#{tracking.task_id}] #{tracking.provider}")
+      IO.puts("   Progress: #{Float.round(tracking.progress * 100, 1)}%")
+      IO.puts("   Elapsed: #{div(elapsed, 1000)}s")
+      IO.puts("   Tokens: #{tracking.tokens_used}")
+      IO.puts("   ETA: #{eta}s")
+    end)
+  end
+
+  defp format_eta(nil), do: "unknown"
+
+  defp format_eta(estimated_completion) do
+    DateTime.diff(estimated_completion, DateTime.utc_now(), :second)
+  end
+
+  defp display_provider_stats do
     provider_stats = Tracker.get_all_provider_stats()
 
     unless Enum.empty?(provider_stats) do
@@ -548,7 +566,6 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         IO.puts("  Completed: #{stats.completed_tasks}")
         IO.puts("  Failed: #{stats.failed_tasks}")
         IO.puts("  Tokens: #{stats.total_tokens}")
-
         IO.puts("  Avg completion: #{Float.round(stats.average_completion_time / 1000, 1)}s")
       end)
     end

@@ -1,7 +1,7 @@
 defmodule MultiAgentCoder.Task.AllocatorTest do
   use ExUnit.Case, async: true
 
-  alias MultiAgentCoder.Task.{Task, Allocator}
+  alias MultiAgentCoder.Task.{Allocator, Task}
 
   describe "auto_allocate/1" do
     test "allocates algorithm task to OpenAI" do
