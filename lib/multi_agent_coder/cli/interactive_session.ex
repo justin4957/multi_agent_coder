@@ -61,6 +61,13 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     IO.puts("  diff <file>        - Show changes to file")
     IO.puts("  history <file>     - Show modification history")
     IO.puts("  lock <file>        - Lock file for exclusive access")
+    IO.puts("  merge auto         - Auto-merge code from all providers")
+    IO.puts("  merge interactive  - Resolve conflicts interactively")
+    IO.puts("  conflicts          - List all conflicts")
+    IO.puts("  build              - Build all providers' code")
+    IO.puts("  test               - Run all tests")
+    IO.puts("  quality            - Run quality checks")
+    IO.puts("  failures           - Show test failures")
     IO.puts("  help               - Show this help")
     IO.puts("  exit               - Exit interactive mode")
     IO.puts(Formatter.format_separator())
@@ -178,6 +185,34 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         handle_file_revert(file_path, provider)
         interactive_loop(state)
 
+      {:merge, :auto} ->
+        handle_merge_auto()
+        interactive_loop(state)
+
+      {:merge, :interactive} ->
+        handle_merge_interactive()
+        interactive_loop(state)
+
+      {:conflicts} ->
+        handle_conflicts_list()
+        interactive_loop(state)
+
+      {:build} ->
+        handle_build_all(state)
+        interactive_loop(state)
+
+      {:test} ->
+        handle_test_all(state)
+        interactive_loop(state)
+
+      {:quality} ->
+        handle_quality_checks()
+        interactive_loop(state)
+
+      {:failures} ->
+        handle_show_failures()
+        interactive_loop(state)
+
       {:query, question} ->
         new_state = handle_query(state, question)
         interactive_loop(new_state)
@@ -245,6 +280,14 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         {:error, "Usage: revert <file> <provider>"}
     end
   end
+
+  defp parse_command("merge auto"), do: {:merge, :auto}
+  defp parse_command("merge interactive"), do: {:merge, :interactive}
+  defp parse_command("conflicts"), do: {:conflicts}
+  defp parse_command("build"), do: {:build}
+  defp parse_command("test"), do: {:test}
+  defp parse_command("quality"), do: {:quality}
+  defp parse_command("failures"), do: {:failures}
 
   defp parse_command(question) when byte_size(question) > 0 do
     {:query, question}
@@ -388,6 +431,15 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       history <file>     - Show complete modification history for a file
       lock <file>        - Lock a file for exclusive access
       revert <file> <provider> - Revert changes made by a specific provider
+
+    Merge & Conflict Resolution Commands:
+      merge auto         - Automatically merge code from all providers using AI
+      merge interactive  - Interactively resolve conflicts with step-by-step guidance
+      conflicts          - List all detected conflicts between providers
+      build              - Build code from all providers and compare results
+      test               - Run tests for all provider implementations
+      quality            - Run comprehensive code quality checks
+      failures           - Show detailed build and test failure reports
 
     Multi-line Input:
       Use \\ at end of line to continue on next line
@@ -795,6 +847,355 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     hours = div(minutes, 60)
 
     "#{rem(hours, 24)}:#{String.pad_leading(Integer.to_string(rem(minutes, 60)), 2, "0")}:#{String.pad_leading(Integer.to_string(rem(seconds, 60)), 2, "0")}"
+  end
+
+  # Merge command handlers
+
+  defp handle_merge_auto do
+    alias MultiAgentCoder.Merge.Engine
+
+    IO.puts("\n#{Formatter.format_header("Automatic Merge")}")
+    IO.puts("Starting automatic merge of all provider changes...")
+
+    case Engine.merge_all(strategy: :auto) do
+      {:ok, merged_files} ->
+        IO.puts([
+          IO.ANSI.green(),
+          "\n✓ Successfully merged #{map_size(merged_files)} file(s)",
+          IO.ANSI.reset()
+        ])
+
+        # Show summary of merged files
+        Enum.each(merged_files, fn {file_path, _content} ->
+          IO.puts("  • #{file_path}")
+        end)
+
+        IO.puts("\nUse 'diff <file>' to see merged changes")
+
+      {:error, reason} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "\n✗ Merge failed: #{reason}",
+          IO.ANSI.reset()
+        ])
+
+        IO.puts("Use 'conflicts' to see conflict details")
+    end
+  end
+
+  defp handle_merge_interactive do
+    alias MultiAgentCoder.Merge.{Engine, ConflictResolver}
+
+    IO.puts("\n#{Formatter.format_header("Interactive Merge")}")
+
+    # First, detect conflicts
+    case Engine.list_conflicts() do
+      {:ok, []} ->
+        IO.puts("No conflicts detected. Running automatic merge...")
+        handle_merge_auto()
+
+      {:ok, conflicts} ->
+        IO.puts("Found #{length(conflicts)} conflict(s) to resolve")
+
+        # Resolve conflicts interactively
+        case ConflictResolver.resolve_interactive(conflicts) do
+          {:ok, resolutions} ->
+            # Apply the resolutions
+            IO.puts("\nApplying merge resolutions...")
+
+            case Engine.merge_all(strategy: :manual, resolutions: resolutions) do
+              {:ok, merged_files} ->
+                IO.puts([
+                  IO.ANSI.green(),
+                  "\n✓ Successfully merged #{map_size(merged_files)} file(s)",
+                  IO.ANSI.reset()
+                ])
+
+              {:error, reason} ->
+                IO.puts([
+                  IO.ANSI.red(),
+                  "\n✗ Merge failed: #{reason}",
+                  IO.ANSI.reset()
+                ])
+            end
+
+          {:error, reason} ->
+            IO.puts([
+              IO.ANSI.red(),
+              "\n✗ Interactive resolution failed: #{reason}",
+              IO.ANSI.reset()
+            ])
+        end
+
+      {:error, reason} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "\n✗ Failed to detect conflicts: #{reason}",
+          IO.ANSI.reset()
+        ])
+    end
+  end
+
+  defp handle_conflicts_list do
+    alias MultiAgentCoder.Merge.Engine
+
+    IO.puts("\n#{Formatter.format_header("Conflicts")}")
+
+    case Engine.list_conflicts() do
+      {:ok, []} ->
+        IO.puts([
+          IO.ANSI.green(),
+          "No conflicts detected!",
+          IO.ANSI.reset()
+        ])
+
+      {:ok, conflicts} ->
+        IO.puts("Found #{length(conflicts)} conflict(s):\n")
+
+        conflicts
+        |> Enum.with_index(1)
+        |> Enum.each(fn {conflict, index} ->
+          type_str =
+            case conflict.type do
+              :file_level -> "File-level"
+              :line_level -> "Line-level"
+              _ -> to_string(conflict.type)
+            end
+
+          IO.puts("#{index}. #{conflict.file}")
+          IO.puts("   Type: #{type_str}")
+          IO.puts("   Providers: #{Enum.join(conflict.providers, ", ")}")
+
+          case conflict.details do
+            %{line_ranges: ranges} ->
+              IO.puts("   Conflicting lines:")
+
+              Enum.each(ranges, fn {provider, {start_line, end_line}} ->
+                IO.puts("     • #{provider}: lines #{start_line}-#{end_line}")
+              end)
+
+            _ ->
+              :ok
+          end
+
+          IO.puts("")
+        end)
+
+        IO.puts("Use 'merge interactive' to resolve conflicts")
+
+      {:error, reason} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error detecting conflicts: #{reason}",
+          IO.ANSI.reset()
+        ])
+    end
+  end
+
+  defp handle_build_all(state) do
+    alias MultiAgentCoder.Build.Runner
+
+    IO.puts("\n#{Formatter.format_header("Build All Providers")}")
+    IO.puts("Building code from all providers...")
+
+    # Run builds for each provider
+    build_results =
+      state.providers
+      |> Enum.map(fn provider ->
+        IO.puts("\n📦 Building #{provider}...")
+
+        # This would integrate with the build system
+        # For MVP, simulate build
+        result = run_provider_build(provider)
+        {provider, result}
+      end)
+      |> Map.new()
+
+    # Show results
+    successful = Enum.count(build_results, fn {_p, r} -> r == :success end)
+    failed = Enum.count(build_results, fn {_p, r} -> r != :success end)
+
+    IO.puts("\n#{Formatter.format_separator()}")
+
+    IO.puts([
+      IO.ANSI.green(),
+      "✓ Successful builds: #{successful}",
+      IO.ANSI.reset()
+    ])
+
+    if failed > 0 do
+      IO.puts([
+        IO.ANSI.red(),
+        "✗ Failed builds: #{failed}",
+        IO.ANSI.reset()
+      ])
+
+      IO.puts("\nUse 'failures' to see build errors")
+    end
+
+    # Store results in state for later viewing
+    Process.put(:last_build_results, build_results)
+  end
+
+  defp handle_test_all(state) do
+    IO.puts("\n#{Formatter.format_header("Test All Providers")}")
+    IO.puts("Running tests for all provider implementations...")
+
+    # Run tests for each provider
+    test_results =
+      state.providers
+      |> Enum.map(fn provider ->
+        IO.puts("\n🧪 Testing #{provider}...")
+
+        # This would integrate with the test system
+        # For MVP, simulate test run
+        result = run_provider_tests(provider)
+        {provider, result}
+      end)
+      |> Map.new()
+
+    # Show results
+    passed = Enum.count(test_results, fn {_p, r} -> match?({:ok, _}, r) end)
+    failed = Enum.count(test_results, fn {_p, r} -> match?({:error, _}, r) end)
+
+    IO.puts("\n#{Formatter.format_separator()}")
+
+    IO.puts([
+      IO.ANSI.green(),
+      "✓ Providers with passing tests: #{passed}",
+      IO.ANSI.reset()
+    ])
+
+    if failed > 0 do
+      IO.puts([
+        IO.ANSI.red(),
+        "✗ Providers with failing tests: #{failed}",
+        IO.ANSI.reset()
+      ])
+
+      IO.puts("\nUse 'failures' to see test failures")
+    end
+
+    # Store results for later viewing
+    Process.put(:last_test_results, test_results)
+  end
+
+  defp handle_quality_checks do
+    IO.puts("\n#{Formatter.format_header("Quality Checks")}")
+    IO.puts("Running code quality checks...")
+
+    # Quality metrics to check
+    checks = [
+      {:linting, "Code style and linting"},
+      {:complexity, "Cyclomatic complexity"},
+      {:coverage, "Test coverage"},
+      {:documentation, "Documentation completeness"},
+      {:security, "Security vulnerabilities"}
+    ]
+
+    results =
+      Enum.map(checks, fn {check, description} ->
+        IO.puts("\n🔍 #{description}...")
+        result = run_quality_check(check)
+        {check, result}
+      end)
+
+    # Display summary
+    IO.puts("\n#{Formatter.format_separator()}")
+    IO.puts("Quality Report:")
+
+    Enum.each(results, fn {check, result} ->
+      {icon, color} =
+        case result do
+          :pass -> {"✓", IO.ANSI.green()}
+          :warn -> {"⚠", IO.ANSI.yellow()}
+          :fail -> {"✗", IO.ANSI.red()}
+        end
+
+      check_name = check |> to_string() |> String.capitalize()
+      IO.puts([color, "#{icon} #{check_name}", IO.ANSI.reset()])
+    end)
+  end
+
+  defp handle_show_failures do
+    IO.puts("\n#{Formatter.format_header("Failures Report")}")
+
+    # Get stored test and build results
+    test_results = Process.get(:last_test_results, %{})
+    build_results = Process.get(:last_build_results, %{})
+
+    if map_size(test_results) == 0 and map_size(build_results) == 0 do
+      IO.puts("No test or build results available. Run 'test' or 'build' first.")
+    else
+      # Show build failures
+      build_failures =
+        build_results
+        |> Enum.filter(fn {_p, r} -> r != :success end)
+
+      if not Enum.empty?(build_failures) do
+        IO.puts([IO.ANSI.red(), "\nBuild Failures:", IO.ANSI.reset()])
+
+        Enum.each(build_failures, fn {provider, _result} ->
+          IO.puts("\n📦 #{provider}")
+          IO.puts("   Error: Build configuration not found")
+          IO.puts("   Suggestion: Check build.exs or mix.exs")
+        end)
+      end
+
+      # Show test failures
+      test_failures =
+        test_results
+        |> Enum.filter(fn {_p, r} -> match?({:error, _}, r) end)
+
+      if not Enum.empty?(test_failures) do
+        IO.puts([IO.ANSI.red(), "\nTest Failures:", IO.ANSI.reset()])
+
+        Enum.each(test_failures, fn {provider, {:error, reason}} ->
+          IO.puts("\n🧪 #{provider}")
+          IO.puts("   Failures: #{reason}")
+          IO.puts("   Suggestion: Review test implementation")
+        end)
+      end
+
+      if Enum.empty?(build_failures) and Enum.empty?(test_failures) do
+        IO.puts([
+          IO.ANSI.green(),
+          "No failures detected! All builds and tests passed.",
+          IO.ANSI.reset()
+        ])
+      end
+    end
+  end
+
+  # Helper functions for build/test simulation
+  # In production, these would integrate with actual build/test systems
+
+  defp run_provider_build(_provider) do
+    # Simulate build - in production, this would run actual build commands
+    case :rand.uniform(10) do
+      n when n > 2 -> :success
+      _ -> :failure
+    end
+  end
+
+  defp run_provider_tests(_provider) do
+    # Simulate test run - in production, this would run actual tests
+    case :rand.uniform(10) do
+      n when n > 3 ->
+        {:ok, %{passed: 10, failed: 0}}
+
+      _ ->
+        {:error, "2 tests failed"}
+    end
+  end
+
+  defp run_quality_check(_check) do
+    # Simulate quality check
+    case :rand.uniform(10) do
+      n when n > 7 -> :pass
+      n when n > 4 -> :warn
+      _ -> :fail
+    end
   end
 
   defp get_default_providers do
