@@ -1,7 +1,7 @@
 defmodule MultiAgentCoder.Merge.EngineTest do
   use ExUnit.Case
   alias MultiAgentCoder.Merge.Engine
-  alias MultiAgentCoder.FileOps.{Tracker, ConflictDetector}
+  alias MultiAgentCoder.FileOps.Tracker
 
   setup do
     # Start necessary processes
@@ -12,16 +12,18 @@ defmodule MultiAgentCoder.Merge.EngineTest do
   describe "merge_all/1" do
     test "successfully merges files from multiple providers with no conflicts" do
       # Setup test data
-      Tracker.track_file(
-        "lib/example.ex",
+      Tracker.track_file_operation(
         :provider1,
-        "defmodule Example do\n  def hello, do: :world\nend"
+        "lib/example.ex",
+        :create,
+        after_content: "defmodule Example do\n  def hello, do: :world\nend"
       )
 
-      Tracker.track_file(
-        "lib/another.ex",
+      Tracker.track_file_operation(
         :provider2,
-        "defmodule Another do\n  def foo, do: :bar\nend"
+        "lib/another.ex",
+        :create,
+        after_content: "defmodule Another do\n  def foo, do: :bar\nend"
       )
 
       # Perform merge
@@ -33,16 +35,18 @@ defmodule MultiAgentCoder.Merge.EngineTest do
 
     test "handles conflicts with auto strategy" do
       # Create conflicting changes
-      Tracker.track_file(
-        "lib/conflict.ex",
+      Tracker.track_file_operation(
         :provider1,
-        "defmodule Conflict do\n  def func, do: 1\nend"
+        "lib/conflict.ex",
+        :create,
+        after_content: "defmodule Conflict do\n  def func, do: 1\nend"
       )
 
-      Tracker.track_file(
-        "lib/conflict.ex",
+      Tracker.track_file_operation(
         :provider2,
-        "defmodule Conflict do\n  def func, do: 2\nend"
+        "lib/conflict.ex",
+        :create,
+        after_content: "defmodule Conflict do\n  def func, do: 2\nend"
       )
 
       # Merge should still succeed with auto strategy
@@ -52,13 +56,15 @@ defmodule MultiAgentCoder.Merge.EngineTest do
 
     test "returns error when no providers are active" do
       # Clear all providers
-      Tracker.clear_all()
+      Tracker.reset()
 
       assert {:error, "No active providers found"} = Engine.merge_all()
     end
 
     test "respects dry_run option" do
-      Tracker.track_file("lib/test.ex", :provider1, "defmodule Test do\nend")
+      Tracker.track_file_operation(:provider1, "lib/test.ex", :create,
+        after_content: "defmodule Test do\nend"
+      )
 
       assert {:ok, merged_files} = Engine.merge_all(dry_run: true)
       assert map_size(merged_files) == 1
@@ -71,8 +77,14 @@ defmodule MultiAgentCoder.Merge.EngineTest do
   describe "merge_file/2" do
     test "merges a specific file from all providers" do
       file_path = "lib/specific.ex"
-      Tracker.track_file(file_path, :provider1, "# Provider 1 version")
-      Tracker.track_file(file_path, :provider2, "# Provider 2 version")
+
+      Tracker.track_file_operation(:provider1, file_path, :create,
+        after_content: "# Provider 1 version"
+      )
+
+      Tracker.track_file_operation(:provider2, file_path, :create,
+        after_content: "# Provider 2 version"
+      )
 
       assert {:ok, merged_content} = Engine.merge_file(file_path, strategy: :last_write_wins)
       assert is_binary(merged_content)
@@ -85,7 +97,7 @@ defmodule MultiAgentCoder.Merge.EngineTest do
     test "handles single provider gracefully" do
       file_path = "lib/single.ex"
       content = "defmodule Single do\nend"
-      Tracker.track_file(file_path, :provider1, content)
+      Tracker.track_file_operation(:provider1, file_path, :create, after_content: content)
 
       assert {:ok, ^content} = Engine.merge_file(file_path)
     end
@@ -93,15 +105,20 @@ defmodule MultiAgentCoder.Merge.EngineTest do
 
   describe "list_conflicts/0" do
     test "returns empty list when no conflicts exist" do
-      Tracker.track_file("lib/file1.ex", :provider1, "content1")
-      Tracker.track_file("lib/file2.ex", :provider2, "content2")
+      Tracker.track_file_operation(:provider1, "lib/file1.ex", :create, after_content: "content1")
+      Tracker.track_file_operation(:provider2, "lib/file2.ex", :create, after_content: "content2")
 
       assert {:ok, []} = Engine.list_conflicts()
     end
 
     test "detects file-level conflicts" do
-      Tracker.track_file("lib/conflict.ex", :provider1, "version1")
-      Tracker.track_file("lib/conflict.ex", :provider2, "version2")
+      Tracker.track_file_operation(:provider1, "lib/conflict.ex", :create,
+        after_content: "version1"
+      )
+
+      Tracker.track_file_operation(:provider2, "lib/conflict.ex", :create,
+        after_content: "version2"
+      )
 
       assert {:ok, conflicts} = Engine.list_conflicts()
       assert length(conflicts) > 0
@@ -127,8 +144,8 @@ defmodule MultiAgentCoder.Merge.EngineTest do
       end
       """
 
-      Tracker.track_file("lib/test.ex", :provider1, content1)
-      Tracker.track_file("lib/test.ex", :provider2, content2)
+      Tracker.track_file_operation(:provider1, "lib/test.ex", :create, after_content: content1)
+      Tracker.track_file_operation(:provider2, "lib/test.ex", :create, after_content: content2)
 
       assert {:ok, conflicts} = Engine.list_conflicts()
       assert length(conflicts) > 0
@@ -137,7 +154,9 @@ defmodule MultiAgentCoder.Merge.EngineTest do
 
   describe "preview_merge/1" do
     test "shows merge preview without applying changes" do
-      Tracker.track_file("lib/preview.ex", :provider1, "# Preview content")
+      Tracker.track_file_operation(:provider1, "lib/preview.ex", :create,
+        after_content: "# Preview content"
+      )
 
       assert {:ok, preview} = Engine.preview_merge()
       assert Map.has_key?(preview, "lib/preview.ex")
@@ -147,9 +166,9 @@ defmodule MultiAgentCoder.Merge.EngineTest do
     end
 
     test "preview includes all provider files" do
-      Tracker.track_file("lib/file1.ex", :provider1, "content1")
-      Tracker.track_file("lib/file2.ex", :provider2, "content2")
-      Tracker.track_file("lib/file3.ex", :provider3, "content3")
+      Tracker.track_file_operation(:provider1, "lib/file1.ex", :create, after_content: "content1")
+      Tracker.track_file_operation(:provider2, "lib/file2.ex", :create, after_content: "content2")
+      Tracker.track_file_operation(:provider3, "lib/file3.ex", :create, after_content: "content3")
 
       assert {:ok, preview} = Engine.preview_merge()
       assert map_size(preview) == 3
@@ -160,9 +179,17 @@ defmodule MultiAgentCoder.Merge.EngineTest do
     setup do
       file_path = "lib/strategy_test.ex"
 
-      Tracker.track_file(file_path, :provider1, "# First version")
-      Tracker.track_file(file_path, :provider2, "# Second version")
-      Tracker.track_file(file_path, :provider3, "# Third version")
+      Tracker.track_file_operation(:provider1, file_path, :create,
+        after_content: "# First version"
+      )
+
+      Tracker.track_file_operation(:provider2, file_path, :create,
+        after_content: "# Second version"
+      )
+
+      Tracker.track_file_operation(:provider3, file_path, :create,
+        after_content: "# Third version"
+      )
 
       {:ok, file_path: file_path}
     end
@@ -186,8 +213,8 @@ defmodule MultiAgentCoder.Merge.EngineTest do
       end
       """
 
-      Tracker.track_file("lib/semantic.ex", :provider1, code1)
-      Tracker.track_file("lib/semantic.ex", :provider2, code2)
+      Tracker.track_file_operation(:provider1, "lib/semantic.ex", :create, after_content: code1)
+      Tracker.track_file_operation(:provider2, "lib/semantic.ex", :create, after_content: code2)
 
       assert {:ok, merged_files} = Engine.merge_all(strategy: :semantic)
       assert Map.has_key?(merged_files, "lib/semantic.ex")
@@ -201,7 +228,9 @@ defmodule MultiAgentCoder.Merge.EngineTest do
 
   describe "integration with test runs" do
     test "runs tests after merge when option is set" do
-      Tracker.track_file("lib/tested.ex", :provider1, "defmodule Tested do\nend")
+      Tracker.track_file_operation(:provider1, "lib/tested.ex", :create,
+        after_content: "defmodule Tested do\nend"
+      )
 
       assert {:ok, merged_files} = Engine.merge_all(run_tests: true)
       assert map_size(merged_files) == 1
@@ -212,7 +241,9 @@ defmodule MultiAgentCoder.Merge.EngineTest do
   describe "error handling" do
     test "handles provider errors gracefully" do
       # Simulate provider with invalid content
-      Tracker.track_file("lib/invalid.ex", :provider1, "invalid elixir code {[}")
+      Tracker.track_file_operation(:provider1, "lib/invalid.ex", :create,
+        after_content: "invalid elixir code {[}"
+      )
 
       # Should still attempt merge
       assert {:ok, merged_files} = Engine.merge_all(strategy: :auto)
