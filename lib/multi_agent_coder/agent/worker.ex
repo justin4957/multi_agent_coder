@@ -12,13 +12,15 @@ defmodule MultiAgentCoder.Agent.Worker do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.Agent.{Anthropic, DeepSeek, Local, OpenAI, Perplexity}
+  alias MultiAgentCoder.Agent.{Anthropic, DeepSeek, Local, OCI, OpenAI, Perplexity}
 
   defstruct [
     :provider,
     :model,
     :api_key,
     :endpoint,
+    :compartment_id,
+    :region,
     :status,
     :current_task,
     :temperature,
@@ -31,10 +33,12 @@ defmodule MultiAgentCoder.Agent.Worker do
   Starts an agent worker process.
 
   ## Options
-    * `:provider` - The provider name (`:openai`, `:anthropic`, `:deepseek`, `:perplexity`, `:local`)
+    * `:provider` - The provider name (`:openai`, `:anthropic`, `:deepseek`, `:perplexity`, `:oci`, `:local`)
     * `:model` - The model to use
     * `:api_key` - API key (optional for local)
     * `:endpoint` - API endpoint (for local providers)
+    * `:compartment_id` - OCI compartment ID (required for oci)
+    * `:region` - OCI region (optional for oci, defaults to us-chicago-1)
     * `:temperature` - Sampling temperature (default: 0.1)
     * `:max_tokens` - Maximum tokens in response (default: 4096)
   """
@@ -78,6 +82,8 @@ defmodule MultiAgentCoder.Agent.Worker do
       model: Keyword.fetch!(opts, :model),
       api_key: resolve_api_key(Keyword.get(opts, :api_key)),
       endpoint: Keyword.get(opts, :endpoint),
+      compartment_id: resolve_config_value(Keyword.get(opts, :compartment_id)),
+      region: resolve_config_value(Keyword.get(opts, :region)),
       status: :idle,
       temperature: Keyword.get(opts, :temperature, 0.1),
       max_tokens: Keyword.get(opts, :max_tokens, 4096)
@@ -103,6 +109,7 @@ defmodule MultiAgentCoder.Agent.Worker do
         :anthropic -> Anthropic.call(state, prompt, context)
         :deepseek -> DeepSeek.call(state, prompt, context)
         :perplexity -> Perplexity.call(state, prompt, context)
+        :oci -> OCI.call(state, prompt, context)
         :local -> Local.call(state, prompt, context)
       end
 
@@ -131,6 +138,7 @@ defmodule MultiAgentCoder.Agent.Worker do
         :anthropic -> Anthropic.call_streaming(state, prompt, context)
         :deepseek -> DeepSeek.call_streaming(state, prompt, context)
         :perplexity -> Perplexity.call_streaming(state, prompt, context)
+        :oci -> OCI.call_streaming(state, prompt, context)
         # Local doesn't support streaming yet
         :local -> Local.call(state, prompt, context)
       end
@@ -158,6 +166,9 @@ defmodule MultiAgentCoder.Agent.Worker do
 
   defp resolve_api_key({:system, env_var}), do: System.get_env(env_var)
   defp resolve_api_key(api_key), do: api_key
+
+  defp resolve_config_value({:system, env_var}), do: System.get_env(env_var)
+  defp resolve_config_value(value), do: value
 
   defp broadcast_status(provider, status) do
     Phoenix.PubSub.broadcast(
