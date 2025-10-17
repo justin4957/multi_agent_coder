@@ -31,6 +31,14 @@ config :multi_agent_coder,
       model: "codellama:latest",
       endpoint: "http://localhost:11434",
       temperature: 0.1
+    ],
+    oci: [
+      model: "cohere.command-r-plus",
+      api_key: {:system, "OCI_API_KEY"},
+      compartment_id: {:system, "OCI_COMPARTMENT_ID"},
+      region: {:system, "OCI_REGION"},
+      temperature: 0.1,
+      max_tokens: 4096
     ]
   ],
   default_strategy: :all,

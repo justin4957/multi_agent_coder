@@ -3,8 +3,8 @@ defmodule MultiAgentCoder.Agent.Supervisor do
   Supervisor for all AI agent worker processes.
 
   Dynamically starts and monitors agent workers for each configured provider
-  (OpenAI, Anthropic, DeepSeek, Local). Uses a one-for-one supervision strategy
-  so that if one agent crashes, others continue working.
+  (OpenAI, Anthropic, DeepSeek, Perplexity, OCI, Local). Uses a one-for-one
+  supervision strategy so that if one agent crashes, others continue working.
   """
 
   use Supervisor

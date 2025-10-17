@@ -28,7 +28,7 @@ MultiAgent Coder is an **interactive CLI** that orchestrates multiple AI provide
 - **Automated Feedback Loop**: Send test results back to providers for iterative improvement
 
 ### Provider Integration
-- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek (DeepSeek Coder), Perplexity AI (with web search), Local LLMs (via Ollama)
+- **Multiple Providers**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek (DeepSeek Coder), Perplexity AI (with web search), Oracle Cloud Infrastructure (OCI) Generative AI, Local LLMs (via Ollama)
 - **Web Search**: Perplexity AI provides real-time web search capabilities with source citations
 - **Tool Use**: Providers can execute bash commands, run tests, install dependencies
 - **Safety Controls**: Command approval workflows for dangerous operations
@@ -191,9 +191,24 @@ export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
 export DEEPSEEK_API_KEY="your-deepseek-key"
 export PERPLEXITY_API_KEY="your-perplexity-key"
+export OCI_API_KEY="your-oci-api-key"
+export OCI_COMPARTMENT_ID="your-oci-compartment-id"
+export OCI_REGION="us-chicago-1"  # Optional, defaults to us-chicago-1
 ```
 
 The CLI will detect these automatically and use them on first run.
+
+### OCI Setup
+
+To use Oracle Cloud Infrastructure (OCI) Generative AI:
+
+1. Sign up for OCI Free Tier at https://www.oracle.com/cloud/free/
+2. Get $300 in free trial credits
+3. Create an API signing key in your OCI console
+4. Note your compartment OCID
+5. Set environment variables as shown above
+
+OCI supports **Cohere Command** models (Command-R, Command-R-Plus) and **Meta Llama** models optimized for coding tasks.
 
 ## Usage
 
@@ -598,6 +613,14 @@ config :multi_agent_coder,
     perplexity: [
       model: "sonar",                    # or "sonar-pro", "codellama", "mixtral"
       api_key: {:system, "PERPLEXITY_API_KEY"},
+      temperature: 0.1,
+      max_tokens: 4096
+    ],
+    oci: [
+      model: "cohere.command-r-plus",    # or "cohere.command-r", "meta.llama-3-70b-instruct"
+      api_key: {:system, "OCI_API_KEY"},
+      compartment_id: {:system, "OCI_COMPARTMENT_ID"},
+      region: {:system, "OCI_REGION"},   # Optional, defaults to us-chicago-1
       temperature: 0.1,
       max_tokens: 4096
     ],
