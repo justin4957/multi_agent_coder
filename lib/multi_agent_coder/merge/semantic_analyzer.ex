@@ -53,7 +53,7 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
       {:ok, code}
     else
       error ->
-        Logger.warn("Semantic merge failed, falling back to text merge: #{inspect(error)}")
+        Logger.warning("Semantic merge failed, falling back to text merge: #{inspect(error)}")
         fallback_text_merge(provider_changes)
     end
   end

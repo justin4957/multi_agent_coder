@@ -99,7 +99,16 @@ defmodule MultiAgentCoder.Merge.Engine do
   # Private functions
 
   defp get_active_providers() do
-    case Tracker.list_providers() do
+    # Get all unique providers from tracked files
+    files = Tracker.list_files()
+
+    providers =
+      files
+      |> Enum.flat_map(fn file -> [file.owner | file.contributors] end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    case providers do
       [] -> {:error, "No active providers found"}
       providers -> {:ok, providers}
     end
@@ -109,15 +118,18 @@ defmodule MultiAgentCoder.Merge.Engine do
     changes =
       providers
       |> Enum.reduce(%{}, fn provider, acc ->
-        files = Tracker.get_provider_files(provider)
+        # Get files where this provider is owner or contributor
+        files = Tracker.list_files(provider: provider)
 
-        Enum.reduce(files, acc, fn file_path, acc2 ->
+        Enum.reduce(files, acc, fn file_info, acc2 ->
+          file_path = file_info.path
+
           Map.update(
             acc2,
             file_path,
-            %{provider => get_file_content(file_path, provider)},
+            %{provider => get_file_content(file_path)},
             fn existing ->
-              Map.put(existing, provider, get_file_content(file_path, provider))
+              Map.put(existing, provider, get_file_content(file_path))
             end
           )
         end)
@@ -126,26 +138,37 @@ defmodule MultiAgentCoder.Merge.Engine do
     {:ok, changes}
   end
 
-  defp get_file_content(file_path, provider) do
-    case Tracker.get_file_changes(file_path, provider) do
-      {:ok, changes} -> changes
-      _ -> nil
+  defp get_file_content(file_path) do
+    # Get the current content from file history
+    case Tracker.get_file_history(file_path) do
+      [latest | _] -> latest.after_content
+      [] -> nil
     end
   end
 
   defp get_file_changes(file_path, providers) do
-    changes =
-      providers
-      |> Enum.map(fn provider ->
-        {provider, get_file_content(file_path, provider)}
-      end)
-      |> Enum.reject(fn {_provider, content} -> is_nil(content) end)
-      |> Map.new()
+    # Get content for each provider that has worked on this file
+    file_info = Tracker.get_file_status(file_path)
 
-    if map_size(changes) == 0 do
-      {:error, "No changes found for file: #{file_path}"}
+    if file_info do
+      content = get_file_content(file_path)
+
+      # Create a map with content for each provider that contributed
+      changes =
+        providers
+        |> Enum.filter(fn provider ->
+          provider == file_info.owner || provider in file_info.contributors
+        end)
+        |> Enum.map(fn provider -> {provider, content} end)
+        |> Map.new()
+
+      if map_size(changes) == 0 do
+        {:error, "No changes found for file: #{file_path}"}
+      else
+        {:ok, changes}
+      end
     else
-      {:ok, changes}
+      {:error, "File not found: #{file_path}"}
     end
   end
 
@@ -229,7 +252,7 @@ defmodule MultiAgentCoder.Merge.Engine do
     apply_merge_spec(provider_changes, merge_spec)
   end
 
-  defp apply_merge_spec(provider_changes, merge_spec) do
+  defp apply_merge_spec(provider_changes, _merge_spec) do
     # Implementation would combine parts from different providers
     # based on the merge specification
     # For now, fall back to semantic merge
@@ -260,7 +283,7 @@ defmodule MultiAgentCoder.Merge.Engine do
     end
   end
 
-  defp run_and_compare_tests(merged_files, providers) do
+  defp run_and_compare_tests(_merged_files, _providers) do
     Logger.info("Running tests on merged code...")
 
     # This would integrate with the build/test system

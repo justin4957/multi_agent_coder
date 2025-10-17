@@ -254,7 +254,7 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
     end
   end
 
-  defp edit_manually(conflict) do
+  defp edit_manually(_conflict) do
     # In a real implementation, this would open an editor
     IO.puts("\n✏️  Manual Edit Mode")
     IO.puts("Enter your custom resolution (end with '.' on a new line):")

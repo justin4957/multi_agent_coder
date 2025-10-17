@@ -71,8 +71,10 @@ defmodule MultiAgentCoder.Build.QualityAnalyzer do
   # Private functions
 
   defp analyze_file(file_path, opts) do
-    case Tracker.get_file_content(file_path) do
-      {:ok, content} ->
+    case Tracker.get_file_history(file_path) do
+      [latest | _] when latest.after_content != nil ->
+        content = latest.after_content
+
         %{
           complexity: analyze_complexity(content, file_path),
           documentation: analyze_documentation(content),
@@ -293,19 +295,28 @@ defmodule MultiAgentCoder.Build.QualityAnalyzer do
     smells = []
 
     # Check for TODO/FIXME comments
-    if Regex.match?(~r/TODO|FIXME|HACK|XXX/i, content) do
-      smells = [{:code_smell, :unfinished_code, "Contains TODO/FIXME comments"} | smells]
-    end
+    smells =
+      if Regex.match?(~r/TODO|FIXME|HACK|XXX/i, content) do
+        [{:code_smell, :unfinished_code, "Contains TODO/FIXME comments"} | smells]
+      else
+        smells
+      end
 
     # Check for magic numbers
-    if Regex.match?(~r/\b\d{3,}\b/, content) do
-      smells = [{:code_smell, :magic_numbers, "Contains magic numbers"} | smells]
-    end
+    smells =
+      if Regex.match?(~r/\b\d{3,}\b/, content) do
+        [{:code_smell, :magic_numbers, "Contains magic numbers"} | smells]
+      else
+        smells
+      end
 
     # Check for deeply nested code
-    if calculate_nesting_depth(content) > 4 do
-      smells = [{:code_smell, :deep_nesting, "Deeply nested code detected"} | smells]
-    end
+    smells =
+      if calculate_nesting_depth(content) > 4 do
+        [{:code_smell, :deep_nesting, "Deeply nested code detected"} | smells]
+      else
+        smells
+      end
 
     smells
   end
@@ -314,13 +325,19 @@ defmodule MultiAgentCoder.Build.QualityAnalyzer do
     bugs = []
 
     # Check for common bug patterns
-    if Regex.match?(~r/==\s*nil|!=\s*nil/, content) do
-      bugs = [{:potential_bug, :nil_check, "Direct nil comparison found"} | bugs]
-    end
+    bugs =
+      if Regex.match?(~r/==\s*nil|!=\s*nil/, content) do
+        [{:potential_bug, :nil_check, "Direct nil comparison found"} | bugs]
+      else
+        bugs
+      end
 
-    if Regex.match?(~r/rescue\s+_/, content) do
-      bugs = [{:potential_bug, :catch_all, "Catch-all rescue clause found"} | bugs]
-    end
+    bugs =
+      if Regex.match?(~r/rescue\s+_/, content) do
+        [{:potential_bug, :catch_all, "Catch-all rescue clause found"} | bugs]
+      else
+        bugs
+      end
 
     bugs
   end
@@ -329,61 +346,80 @@ defmodule MultiAgentCoder.Build.QualityAnalyzer do
     issues = []
 
     # Check for N+1 query patterns
-    if Regex.match?(~r/Enum\.map.*?Repo\.|for.*?do.*?Repo\./, content) do
-      issues = [{:performance, :n_plus_one, "Potential N+1 query pattern"} | issues]
-    end
+    issues =
+      if Regex.match?(~r/Enum\.map.*?Repo\.|for.*?do.*?Repo\./, content) do
+        [{:performance, :n_plus_one, "Potential N+1 query pattern"} | issues]
+      else
+        issues
+      end
 
     # Check for inefficient string concatenation in loops
-    if Regex.match?(~r/Enum\.reduce.*?<>|for.*?do.*?<>/, content) do
-      issues = [{:performance, :string_concat, "String concatenation in loop"} | issues]
-    end
+    issues =
+      if Regex.match?(~r/Enum\.reduce.*?<>|for.*?do.*?<>/, content) do
+        [{:performance, :string_concat, "String concatenation in loop"} | issues]
+      else
+        issues
+      end
 
     issues
   end
 
   defp scan_for_vulnerabilities(file_path) do
-    case Tracker.get_file_content(file_path) do
-      {:ok, content} ->
+    case Tracker.get_file_history(file_path) do
+      [latest | _] when latest.after_content != nil ->
+        content = latest.after_content
         vulnerabilities = []
 
         # Check for hardcoded secrets
-        if Regex.match?(~r/password\s*=\s*["'][^"']+["']|api_key\s*=\s*["'][^"']+["']/i, content) do
-          vulnerabilities = [
-            %{
-              type: :hardcoded_secret,
-              severity: :high,
-              file: file_path,
-              description: "Potential hardcoded credentials detected"
-            }
-            | vulnerabilities
-          ]
-        end
+        vulnerabilities =
+          if Regex.match?(
+               ~r/password\s*=\s*["'][^"']+["']|api_key\s*=\s*["'][^"']+["']/i,
+               content
+             ) do
+            [
+              %{
+                type: :hardcoded_secret,
+                severity: :high,
+                file: file_path,
+                description: "Potential hardcoded credentials detected"
+              }
+              | vulnerabilities
+            ]
+          else
+            vulnerabilities
+          end
 
         # Check for SQL injection vulnerabilities
-        if Regex.match?(~r/Repo\.query.*?<>|execute.*?".*?#\{/, content) do
-          vulnerabilities = [
-            %{
-              type: :sql_injection,
-              severity: :critical,
-              file: file_path,
-              description: "Potential SQL injection vulnerability"
-            }
-            | vulnerabilities
-          ]
-        end
+        vulnerabilities =
+          if Regex.match?(~r/Repo\.query.*?<>|execute.*?".*?#\{/, content) do
+            [
+              %{
+                type: :sql_injection,
+                severity: :critical,
+                file: file_path,
+                description: "Potential SQL injection vulnerability"
+              }
+              | vulnerabilities
+            ]
+          else
+            vulnerabilities
+          end
 
         # Check for unsafe deserialization
-        if Regex.match?(~r/:erlang\.binary_to_term|:pickle\.loads/, content) do
-          vulnerabilities = [
-            %{
-              type: :unsafe_deserialization,
-              severity: :high,
-              file: file_path,
-              description: "Unsafe deserialization detected"
-            }
-            | vulnerabilities
-          ]
-        end
+        vulnerabilities =
+          if Regex.match?(~r/:erlang\.binary_to_term|:pickle\.loads/, content) do
+            [
+              %{
+                type: :unsafe_deserialization,
+                severity: :high,
+                file: file_path,
+                description: "Unsafe deserialization detected"
+              }
+              | vulnerabilities
+            ]
+          else
+            vulnerabilities
+          end
 
         vulnerabilities
 

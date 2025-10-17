@@ -110,7 +110,8 @@ defmodule MultiAgentCoder.Build.Runner do
     quality_results =
       providers
       |> Enum.map(fn provider ->
-        files = Tracker.get_provider_files(provider)
+        # Get files for this provider
+        files = Tracker.list_files(provider: provider) |> Enum.map(& &1.path)
         analysis = QualityAnalyzer.analyze_files(files, opts)
         {provider, analysis}
       end)
@@ -147,7 +148,7 @@ defmodule MultiAgentCoder.Build.Runner do
     Logger.info("Building #{provider}...")
 
     # Get provider-specific files
-    files = Tracker.get_provider_files(provider)
+    files = Tracker.list_files(provider: provider) |> Enum.map(& &1.path)
 
     if Enum.empty?(files) do
       {:error, "No files to build"}
@@ -193,7 +194,7 @@ defmodule MultiAgentCoder.Build.Runner do
     Logger.info("Testing #{provider}...")
 
     # Get provider-specific files
-    files = Tracker.get_provider_files(provider)
+    files = Tracker.list_files(provider: provider) |> Enum.map(& &1.path)
 
     if Enum.empty?(files) do
       {:error, "No files to test"}
@@ -248,10 +249,11 @@ defmodule MultiAgentCoder.Build.Runner do
 
   defp copy_provider_files(files, tmp_dir) do
     Enum.each(files, fn file_path ->
-      case Tracker.get_file_content(file_path) do
-        {:ok, content} ->
+      # Get the latest content from file history
+      case Tracker.get_file_history(file_path) do
+        [latest | _] when latest.after_content != nil ->
           dest_path = Path.join(tmp_dir, Path.basename(file_path))
-          File.write!(dest_path, content)
+          File.write!(dest_path, latest.after_content)
 
         _ ->
           :ok
@@ -396,7 +398,13 @@ defmodule MultiAgentCoder.Build.Runner do
   end
 
   defp get_active_providers do
-    Tracker.list_providers()
+    # Get all unique providers from tracked files
+    files = Tracker.list_files()
+
+    files
+    |> Enum.flat_map(fn file -> [file.owner | file.contributors] end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
   end
 
   defp default_build_command do

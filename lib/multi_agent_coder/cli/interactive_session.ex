@@ -993,8 +993,6 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp handle_build_all(state) do
-    alias MultiAgentCoder.Build.Runner
-
     IO.puts("\n#{Formatter.format_header("Build All Providers")}")
     IO.puts("Building code from all providers...")
 
