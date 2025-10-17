@@ -286,7 +286,13 @@ defmodule MultiAgentCoder.FileOps.Tracker do
 
   @impl true
   def handle_call({:get_file_status, file_path}, _from, state) do
-    status = build_file_info(file_path, state)
+    status =
+      if Map.has_key?(state.file_statuses, file_path) do
+        build_file_info(file_path, state)
+      else
+        nil
+      end
+
     {:reply, status, state}
   end
 
