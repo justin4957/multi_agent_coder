@@ -57,6 +57,10 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
     IO.puts("  task queue <desc>  - Add task to allocation queue")
     IO.puts("  task list          - Show all queued tasks")
     IO.puts("  task status        - Show queue statistics")
+    IO.puts("  files              - List all tracked files")
+    IO.puts("  diff <file>        - Show changes to file")
+    IO.puts("  history <file>     - Show modification history")
+    IO.puts("  lock <file>        - Lock file for exclusive access")
     IO.puts("  help               - Show this help")
     IO.puts("  exit               - Exit interactive mode")
     IO.puts(Formatter.format_separator())
@@ -154,6 +158,26 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         handle_task_track()
         interactive_loop(state)
 
+      {:files} ->
+        handle_files_list()
+        interactive_loop(state)
+
+      {:diff, file_path} ->
+        handle_file_diff(file_path)
+        interactive_loop(state)
+
+      {:file_history, file_path} ->
+        handle_file_history(file_path)
+        interactive_loop(state)
+
+      {:lock, file_path} ->
+        handle_file_lock(file_path, state)
+        interactive_loop(state)
+
+      {:revert, file_path, provider} ->
+        handle_file_revert(file_path, provider)
+        interactive_loop(state)
+
       {:query, question} ->
         new_state = handle_query(state, question)
         interactive_loop(new_state)
@@ -196,6 +220,30 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
 
   defp parse_command("task cancel " <> task_id) do
     {:task, {:cancel, task_id}}
+  end
+
+  defp parse_command("files"), do: {:files}
+
+  defp parse_command("diff " <> file_path) do
+    {:diff, String.trim(file_path)}
+  end
+
+  defp parse_command("history " <> file_path) do
+    {:file_history, String.trim(file_path)}
+  end
+
+  defp parse_command("lock " <> file_path) do
+    {:lock, String.trim(file_path)}
+  end
+
+  defp parse_command("revert " <> rest) do
+    case String.split(rest, " ", parts: 2) do
+      [file_path, provider_str] ->
+        {:revert, String.trim(file_path), String.to_atom(String.trim(provider_str))}
+
+      _ ->
+        {:error, "Usage: revert <file> <provider>"}
+    end
   end
 
   defp parse_command(question) when byte_size(question) > 0 do
@@ -333,6 +381,13 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       task status        - Show queue statistics and summary
       task track         - Show detailed tracking info for active tasks
       task cancel <id>   - Cancel a queued or running task by ID
+
+    File Operations Commands:
+      files              - List all tracked files with status and ownership
+      diff <file>        - Show changes to a specific file
+      history <file>     - Show complete modification history for a file
+      lock <file>        - Lock a file for exclusive access
+      revert <file> <provider> - Revert changes made by a specific provider
 
     Multi-line Input:
       Use \\ at end of line to continue on next line
@@ -569,6 +624,177 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         IO.puts("  Avg completion: #{Float.round(stats.average_completion_time / 1000, 1)}s")
       end)
     end
+  end
+
+  defp handle_files_list do
+    alias MultiAgentCoder.FileOps.Tracker
+
+    files = Tracker.list_files()
+
+    IO.puts("\n#{Formatter.format_header("Tracked Files")}")
+
+    if Enum.empty?(files) do
+      IO.puts("No files tracked yet.")
+    else
+      IO.puts(
+        String.pad_trailing("File", 50) <>
+          " " <>
+          String.pad_trailing("Status", 10) <>
+          " " <>
+          String.pad_trailing("Owner", 15) <>
+          " Lines"
+      )
+
+      IO.puts(String.duplicate("─", 90))
+
+      Enum.each(files, fn file ->
+        status_icon =
+          case file.status do
+            :new -> "⚡ NEW"
+            :modified -> "📝 MOD"
+            :deleted -> "🗑 DEL"
+            :active -> "⚡ ACTIVE"
+            :locked -> "🔒 LOCK"
+            :conflict -> "⚠ CONFLICT"
+            _ -> "?"
+          end
+
+        owner_str = if file.owner, do: to_string(file.owner), else: "-"
+
+        IO.puts(
+          String.pad_trailing(file.path, 50) <>
+            " " <>
+            String.pad_trailing(status_icon, 10) <>
+            " " <>
+            String.pad_trailing(owner_str, 15) <>
+            " #{file.lines}"
+        )
+      end)
+
+      # Show statistics
+      stats = Tracker.get_stats()
+      IO.puts("\n#{Formatter.format_separator()}")
+      IO.puts("Total files: #{stats.total_files} | Active providers: #{stats.active_providers}")
+
+      if stats.conflicts && stats.conflicts.unresolved_conflicts > 0 do
+        IO.puts([
+          IO.ANSI.red(),
+          "Unresolved conflicts: #{stats.conflicts.unresolved_conflicts}",
+          IO.ANSI.reset()
+        ])
+      end
+    end
+  end
+
+  defp handle_file_diff(file_path) do
+    alias MultiAgentCoder.FileOps.{Diff, Tracker}
+
+    case Tracker.get_file_diff(file_path) do
+      {:ok, diff} ->
+        IO.puts("\n#{Formatter.format_header("Diff: #{file_path}")}")
+        IO.puts(Diff.format(diff, color: true))
+
+      {:error, :not_found} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error: No history found for #{file_path}",
+          IO.ANSI.reset()
+        ])
+    end
+  end
+
+  defp handle_file_history(file_path) do
+    alias MultiAgentCoder.FileOps.Tracker
+
+    history = Tracker.get_file_history(file_path)
+
+    IO.puts("\n#{Formatter.format_header("History: #{file_path}")}")
+
+    if Enum.empty?(history) do
+      IO.puts("No history found for this file.")
+    else
+      Enum.each(history, fn entry ->
+        timestamp = format_timestamp(entry.timestamp)
+
+        operation_str =
+          case entry.operation do
+            :create -> "Created"
+            :modify -> "Modified"
+            :delete -> "Deleted"
+          end
+
+        IO.puts(
+          "#{timestamp} [#{entry.provider}] #{operation_str} (+#{entry.diff.stats.additions}/-#{entry.diff.stats.deletions})"
+        )
+      end)
+    end
+  end
+
+  defp handle_file_lock(file_path, state) do
+    alias MultiAgentCoder.FileOps.Tracker
+
+    # Use first provider in session as locking provider
+    provider = List.first(state.providers)
+
+    case Tracker.lock_file(file_path, provider) do
+      :ok ->
+        IO.puts([
+          IO.ANSI.green(),
+          "✓ File locked: #{file_path}",
+          IO.ANSI.reset()
+        ])
+
+      {:error, :locked} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error: File is already locked by another provider",
+          IO.ANSI.reset()
+        ])
+    end
+  end
+
+  defp handle_file_revert(file_path, provider) do
+    alias MultiAgentCoder.FileOps.Tracker
+
+    case Tracker.revert_provider_changes(file_path, provider) do
+      {:ok, nil} ->
+        IO.puts([
+          IO.ANSI.yellow(),
+          "✓ File reverted (provider created the file, so it would be deleted)",
+          IO.ANSI.reset()
+        ])
+
+      {:ok, content} ->
+        IO.puts([
+          IO.ANSI.green(),
+          "✓ Reverted changes by #{provider}",
+          IO.ANSI.reset()
+        ])
+
+        IO.puts("\nReverted content preview:")
+        IO.puts(String.slice(content, 0, 500))
+
+        if String.length(content) > 500 do
+          IO.puts("... (truncated)")
+        end
+
+      {:error, :not_possible} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error: Cannot revert changes (dependencies exist)",
+          IO.ANSI.reset()
+        ])
+    end
+  end
+
+  defp format_timestamp(monotonic_time) do
+    # Convert monotonic time to a readable format
+    # This is a simplified version - in production, you'd want to track actual timestamps
+    seconds = div(monotonic_time, 1000)
+    minutes = div(seconds, 60)
+    hours = div(minutes, 60)
+
+    "#{rem(hours, 24)}:#{String.pad_leading(Integer.to_string(rem(minutes, 60)), 2, "0")}:#{String.pad_leading(Integer.to_string(rem(seconds, 60)), 2, "0")}"
   end
 
   defp get_default_providers do
