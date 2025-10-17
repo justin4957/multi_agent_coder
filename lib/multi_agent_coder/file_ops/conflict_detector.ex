@@ -9,7 +9,7 @@ defmodule MultiAgentCoder.FileOps.ConflictDetector do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.FileOps.{Diff, History, Ownership}
+  alias MultiAgentCoder.FileOps.Ownership
 
   defstruct [
     :pending_operations,
@@ -174,13 +174,9 @@ defmodule MultiAgentCoder.FileOps.ConflictDetector do
     active_providers = Map.get(state.active_operations, file_path, [])
     concurrent_access? = provider not in active_providers && length(active_providers) > 0
 
-    # Check for line-level conflicts if line ranges provided
-    line_conflict? =
-      if line_ranges && concurrent_access? do
-        detect_line_conflicts(file_path, provider, line_ranges, state)
-      else
-        false
-      end
+    # Note: Line-level conflict detection is not yet implemented
+    # Would check for overlapping line ranges when multiple providers modify the same file
+    _ = line_ranges
 
     result =
       cond do
@@ -191,17 +187,6 @@ defmodule MultiAgentCoder.FileOps.ConflictDetector do
               [locked_by, provider],
               :file_level,
               %{locked_by: locked_by, reason: "File is locked"}
-            )
-
-          {:conflict, conflict}
-
-        line_conflict? ->
-          conflict =
-            create_conflict(
-              file_path,
-              [provider | active_providers],
-              :line_level,
-              %{line_ranges: line_ranges, reason: "Overlapping line modifications"}
             )
 
           {:conflict, conflict}
@@ -366,12 +351,6 @@ defmodule MultiAgentCoder.FileOps.ConflictDetector do
 
   defp generate_conflict_id do
     :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
-  end
-
-  defp detect_line_conflicts(_file_path, _provider, _line_ranges, _state) do
-    # Simplified implementation - in production, would analyze actual line ranges
-    # being modified by concurrent providers
-    false
   end
 
   defp count_by_type(conflicts) do
