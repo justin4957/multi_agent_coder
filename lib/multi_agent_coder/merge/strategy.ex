@@ -209,10 +209,10 @@ defmodule MultiAgentCoder.Merge.Strategy do
   end
 
   defp apply_last_write_wins(provider_contents) do
-    # Get the last provider's content (assuming ordered by timestamp)
+    # Get the last provider's content (sorted by provider name for determinism)
     last_content =
       provider_contents
-      |> Map.to_list()
+      |> Enum.sort_by(fn {provider, _} -> provider end)
       |> List.last()
       |> elem(1)
 
@@ -220,10 +220,10 @@ defmodule MultiAgentCoder.Merge.Strategy do
   end
 
   defp apply_first_write_wins(provider_contents) do
-    # Get the first provider's content
+    # Get the first provider's content (sorted by provider name for determinism)
     first_content =
       provider_contents
-      |> Map.to_list()
+      |> Enum.sort_by(fn {provider, _} -> provider end)
       |> List.first()
       |> elem(1)
 
