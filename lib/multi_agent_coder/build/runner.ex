@@ -10,7 +10,6 @@ defmodule MultiAgentCoder.Build.Runner do
   """
 
   alias MultiAgentCoder.FileOps.Tracker
-  alias MultiAgentCoder.Agent.Worker
   alias MultiAgentCoder.Build.{TestComparator, QualityAnalyzer}
 
   require Logger
@@ -394,7 +393,8 @@ defmodule MultiAgentCoder.Build.Runner do
     Logger.info("Sending feedback to #{provider}: #{inspect(feedback)}")
 
     # In a real implementation, this would communicate with the agent
-    Worker.send_feedback(provider, feedback)
+    # Worker.send_feedback/2 will be implemented in future PR
+    :ok
   end
 
   defp get_active_providers do

@@ -190,9 +190,19 @@ defmodule MultiAgentCoder.Merge.Engine do
     # Use ConflictDetector to identify specific conflicts
     providers = Map.keys(provider_changes)
 
-    case ConflictDetector.detect_conflicts(file_path, providers) do
-      {:ok, conflicts} -> conflicts
-      _ -> []
+    # ConflictDetector.detect_conflicts/2 will be implemented in future PR
+    # For now, detect basic conflicts when multiple providers modified same file
+    if length(providers) > 1 do
+      [
+        %{
+          file: file_path,
+          type: :file_level,
+          providers: providers,
+          details: %{contents: provider_changes}
+        }
+      ]
+    else
+      []
     end
   end
 

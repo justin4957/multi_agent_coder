@@ -898,31 +898,23 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
         IO.puts("Found #{length(conflicts)} conflict(s) to resolve")
 
         # Resolve conflicts interactively
-        case ConflictResolver.resolve_interactive(conflicts) do
-          {:ok, resolutions} ->
-            # Apply the resolutions
-            IO.puts("\nApplying merge resolutions...")
+        {:ok, resolutions} = ConflictResolver.resolve_interactive(conflicts)
 
-            case Engine.merge_all(strategy: :manual, resolutions: resolutions) do
-              {:ok, merged_files} ->
-                IO.puts([
-                  IO.ANSI.green(),
-                  "\n✓ Successfully merged #{map_size(merged_files)} file(s)",
-                  IO.ANSI.reset()
-                ])
+        # Apply the resolutions
+        IO.puts("\nApplying merge resolutions...")
 
-              {:error, reason} ->
-                IO.puts([
-                  IO.ANSI.red(),
-                  "\n✗ Merge failed: #{reason}",
-                  IO.ANSI.reset()
-                ])
-            end
+        case Engine.merge_all(strategy: :manual, resolutions: resolutions) do
+          {:ok, merged_files} ->
+            IO.puts([
+              IO.ANSI.green(),
+              "\n✓ Successfully merged #{map_size(merged_files)} file(s)",
+              IO.ANSI.reset()
+            ])
 
           {:error, reason} ->
             IO.puts([
               IO.ANSI.red(),
-              "\n✗ Interactive resolution failed: #{reason}",
+              "\n✗ Merge failed: #{reason}",
               IO.ANSI.reset()
             ])
         end
