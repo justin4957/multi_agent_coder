@@ -7,8 +7,7 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
   """
 
   alias MultiAgentCoder.FileOps.ConflictDetector
-  alias MultiAgentCoder.Merge.SemanticAnalyzer
-  alias MultiAgentCoder.Merge.Strategy
+  alias MultiAgentCoder.Merge.{SemanticAnalyzer, Strategy, MLResolver, PatternLearner}
 
   require Logger
 
@@ -147,6 +146,9 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
     show_conflict(conflict)
     show_conflict_contents(conflict)
 
+    # Show ML-powered suggestion if available
+    show_ml_suggestion(conflict)
+
     IO.puts("\n🔧 Resolution Options:")
     IO.puts("  1. Accept provider version")
     IO.puts("  2. Merge semantically")
@@ -154,31 +156,43 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
     IO.puts("  4. Edit manually")
     IO.puts("  5. Skip (mark for later)")
     IO.puts("  6. View side-by-side diff")
+    IO.puts("  7. Use ML recommendation")
 
-    case IO.gets("\nChoose option [1-6]: ") |> String.trim() do
-      "1" ->
-        choose_provider(conflict)
+    resolution =
+      case IO.gets("\nChoose option [1-7]: ") |> String.trim() do
+        "1" ->
+          choose_provider(conflict)
 
-      "2" ->
-        {:merge, :semantic}
+        "2" ->
+          {:merge, :semantic}
 
-      "3" ->
-        choose_merge_strategy(conflict)
+        "3" ->
+          choose_merge_strategy(conflict)
 
-      "4" ->
-        edit_manually(conflict)
+        "4" ->
+          edit_manually(conflict)
 
-      "5" ->
-        {:skip, conflict}
+        "5" ->
+          {:skip, conflict}
 
-      "6" ->
-        show_side_by_side_diff(conflict)
-        resolve_single_interactive(conflict)
+        "6" ->
+          show_side_by_side_diff(conflict)
+          resolve_single_interactive(conflict)
 
-      _ ->
-        IO.puts("❌ Invalid option, please try again")
-        resolve_single_interactive(conflict)
+        "7" ->
+          apply_ml_recommendation(conflict)
+
+        _ ->
+          IO.puts("❌ Invalid option, please try again")
+          resolve_single_interactive(conflict)
+      end
+
+    # Record the user's choice for learning
+    unless resolution == {:skip, conflict} do
+      PatternLearner.record_resolution(conflict, resolution)
     end
+
+    resolution
   end
 
   defp show_conflict_contents(conflict) do
@@ -234,8 +248,11 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
     IO.puts("  2. Intersection (common changes only)")
     IO.puts("  3. Three-way merge")
     IO.puts("  4. Line-by-line selection")
+    IO.puts("  5. Voting-based (score all versions)")
+    IO.puts("  6. Hybrid (best of both)")
+    IO.puts("  7. Context-aware")
 
-    case IO.gets("\nChoose strategy [1-4]: ") |> String.trim() do
+    case IO.gets("\nChoose strategy [1-7]: ") |> String.trim() do
       "1" ->
         {:merge, %{strategy: :union}}
 
@@ -247,6 +264,15 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
 
       "4" ->
         line_by_line_merge(conflict)
+
+      "5" ->
+        {:merge, %{strategy: :voting}}
+
+      "6" ->
+        {:merge, %{strategy: :hybrid}}
+
+      "7" ->
+        {:merge, %{strategy: :context_aware}}
 
       _ ->
         IO.puts("❌ Invalid strategy")
@@ -457,5 +483,59 @@ defmodule MultiAgentCoder.Merge.ConflictResolver do
 
   defp apply_rule_resolution(_conflict, resolution) do
     {:merge, resolution}
+  end
+
+  defp show_ml_suggestion(conflict) do
+    case MLResolver.analyze_conflict(conflict) do
+      {:ok, analysis} ->
+        if analysis.confidence > 0.5 do
+          IO.puts("\n💡 ML Suggestion:")
+          IO.puts("   Strategy: #{analysis.recommended_strategy}")
+
+          if analysis.recommended_provider do
+            IO.puts("   Provider: #{analysis.recommended_provider}")
+          end
+
+          IO.puts("   Confidence: #{Float.round(analysis.confidence * 100, 1)}%")
+          IO.puts("   Severity: #{analysis.severity}")
+          IO.puts("   Difficulty: #{analysis.difficulty}")
+
+          if not Enum.empty?(analysis.reasoning) do
+            IO.puts("   Reasoning:")
+
+            Enum.each(analysis.reasoning, fn reason ->
+              IO.puts("     • #{reason}")
+            end)
+          end
+        end
+
+      {:error, _} ->
+        :ok
+    end
+  end
+
+  defp apply_ml_recommendation(conflict) do
+    case MLResolver.analyze_conflict(conflict) do
+      {:ok, analysis} ->
+        IO.puts("\n✨ Applying ML recommendation...")
+
+        if analysis.recommended_provider do
+          {:accept, analysis.recommended_provider}
+        else
+          case analysis.recommended_strategy do
+            :manual ->
+              IO.puts("ML recommends manual review. Falling back to interactive mode.")
+              resolve_single_interactive(conflict)
+
+            strategy ->
+              {:merge, %{strategy: strategy}}
+          end
+        end
+
+      {:error, reason} ->
+        IO.puts("❌ ML recommendation failed: #{reason}")
+        IO.puts("Please choose another option.")
+        resolve_single_interactive(conflict)
+    end
   end
 end
