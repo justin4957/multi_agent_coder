@@ -44,7 +44,10 @@ defmodule MultiAgentCoder.Application do
       MultiAgentCoder.FileOps.Ownership,
       MultiAgentCoder.FileOps.History,
       MultiAgentCoder.FileOps.ConflictDetector,
-      MultiAgentCoder.FileOps.Tracker
+      MultiAgentCoder.FileOps.Tracker,
+
+      # ML-based conflict resolution learning
+      MultiAgentCoder.Merge.PatternLearner
     ]
 
     opts = [strategy: :one_for_one, name: MultiAgentCoder.Supervisor]
