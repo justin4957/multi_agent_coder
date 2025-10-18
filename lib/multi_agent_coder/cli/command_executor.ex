@@ -8,7 +8,7 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
 
   require Logger
 
-  alias MultiAgentCoder.Agent.Worker
+  alias MultiAgentCoder.Agent.{ProviderHealth, Worker}
   alias MultiAgentCoder.Build.Runner, as: BuildRunner
   alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, Help}
   alias MultiAgentCoder.FileOps.{Diff, Tracker}
@@ -16,6 +16,7 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
   alias MultiAgentCoder.Task.{Allocator, Queue}
   alias MultiAgentCoder.Task.Tracker, as: TaskTracker
   alias MultiAgentCoder.Task.Task, as: CodingTask
+  alias MultiAgentCoder.Utils.{CodeExtractor, CodeValidator, ProjectScaffolder}
 
   @type session_state :: %{
           providers: list(atom()),
@@ -228,6 +229,31 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
 
   def execute({:providers}, state) do
     display_provider_status(state)
+    {:continue, state}
+  end
+
+  def execute({:provider_health}, state) do
+    IO.puts([IO.ANSI.cyan(), "\n╔═══ Provider Health Check ═══╗\n", IO.ANSI.reset()])
+
+    health_status = ProviderHealth.check_all_providers()
+
+    health_status
+    |> Enum.each(fn {provider, status} ->
+      case status do
+        {:ok, :healthy} ->
+          IO.puts([
+            IO.ANSI.green(),
+            "✓ #{provider |> to_string() |> String.capitalize()} - Ready",
+            IO.ANSI.reset()
+          ])
+
+        {:error, reason} ->
+          error_msg = ProviderHealth.get_error_guidance(provider, reason)
+          IO.puts([IO.ANSI.red(), error_msg, IO.ANSI.reset()])
+      end
+    end)
+
+    IO.puts("")
     {:continue, state}
   end
 
@@ -671,6 +697,27 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
 
   def execute({:failures}, state) do
     handle_show_failures()
+    {:continue, state}
+  end
+
+  # Code extraction and validation commands
+  def execute({:extract_code, response_file, output_dir}, state) do
+    handle_code_extraction(response_file, output_dir)
+    {:continue, state}
+  end
+
+  def execute({:validate, language, project_dir}, state) do
+    handle_code_validation(language, project_dir)
+    {:continue, state}
+  end
+
+  def execute({:scaffold, project_name, language}, state) do
+    handle_scaffold_project(project_name, language, File.cwd!())
+    {:continue, state}
+  end
+
+  def execute({:scaffold, project_name, language, output_dir}, state) do
+    handle_scaffold_project(project_name, language, output_dir)
     {:continue, state}
   end
 
@@ -1135,5 +1182,161 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
   defp handle_show_failures do
     IO.puts("\n#{Formatter.format_header("Failures Report")}")
     IO.puts("No failures to report")
+  end
+
+  # Code extraction, validation, and scaffolding handlers
+
+  defp handle_code_extraction(response_file, output_dir) do
+    IO.puts([
+      IO.ANSI.cyan(),
+      "\n╔═══ Extracting Code ═══╗\n",
+      IO.ANSI.reset()
+    ])
+
+    case File.read(response_file) do
+      {:ok, content} ->
+        case CodeExtractor.extract_and_write(content, output_dir, create_subdirs: true) do
+          {:ok, written_files} ->
+            created = Enum.filter(written_files, fn {status, _} -> status == :created end)
+            skipped = Enum.filter(written_files, fn {status, _} -> status == :skipped end)
+
+            if length(created) > 0 do
+              IO.puts([IO.ANSI.green(), "✓ Created #{length(created)} file(s):", IO.ANSI.reset()])
+
+              Enum.each(created, fn {:created, file_path} ->
+                IO.puts("  • #{file_path}")
+              end)
+            end
+
+            if length(skipped) > 0 do
+              IO.puts([
+                IO.ANSI.yellow(),
+                "\n⚠ Skipped #{length(skipped)} existing file(s)",
+                IO.ANSI.reset()
+              ])
+            end
+
+          {:error, reason} ->
+            IO.puts([IO.ANSI.red(), "Error: #{inspect(reason)}", IO.ANSI.reset()])
+        end
+
+      {:error, reason} ->
+        IO.puts([IO.ANSI.red(), "Error reading file: #{inspect(reason)}", IO.ANSI.reset()])
+    end
+
+    IO.puts("")
+  end
+
+  defp handle_code_validation(language, project_dir) do
+    IO.puts([
+      IO.ANSI.cyan(),
+      "\n╔═══ Validating Code ═══╗\n",
+      IO.ANSI.reset()
+    ])
+
+    language_atom = String.to_atom(language)
+
+    case CodeValidator.full_validation(language_atom, project_dir) do
+      {:ok, results} ->
+        # Display compilation results
+        IO.puts([IO.ANSI.cyan(), "Compilation:", IO.ANSI.reset()])
+
+        if results.compilation.success do
+          IO.puts([IO.ANSI.green(), "  ✓ Code compiled successfully", IO.ANSI.reset()])
+
+          if length(results.compilation.warnings || []) > 0 do
+            IO.puts([
+              IO.ANSI.yellow(),
+              "  ⚠ #{length(results.compilation.warnings)} warning(s)",
+              IO.ANSI.reset()
+            ])
+          end
+        else
+          IO.puts([IO.ANSI.red(), "  ✗ Compilation failed", IO.ANSI.reset()])
+
+          Enum.each(results.compilation.errors || [], fn error ->
+            IO.puts("    • #{error}")
+          end)
+        end
+
+        # Display test results
+        IO.puts([IO.ANSI.cyan(), "\nTests:", IO.ANSI.reset()])
+
+        if results.tests.passed do
+          IO.puts([
+            IO.ANSI.green(),
+            "  ✓ All #{results.tests.total} test(s) passed",
+            IO.ANSI.reset()
+          ])
+        else
+          IO.puts([
+            IO.ANSI.red(),
+            "  ✗ #{results.tests.failures} of #{results.tests.total} test(s) failed",
+            IO.ANSI.reset()
+          ])
+
+          Enum.each(results.tests.errors || [], fn error ->
+            IO.puts("    • #{inspect(error)}")
+          end)
+        end
+
+        # Overall result
+        IO.puts("")
+
+        if results.passed do
+          IO.puts([IO.ANSI.green(), "✓ Validation passed!\n", IO.ANSI.reset()])
+        else
+          IO.puts([IO.ANSI.red(), "✗ Validation failed\n", IO.ANSI.reset()])
+        end
+
+      {:error, reason} ->
+        IO.puts([IO.ANSI.red(), "Error: #{inspect(reason)}\n", IO.ANSI.reset()])
+    end
+  end
+
+  defp handle_scaffold_project(project_name, language, output_dir) do
+    IO.puts([
+      IO.ANSI.cyan(),
+      "\n╔═══ Scaffolding Project ═══╗\n",
+      IO.ANSI.reset()
+    ])
+
+    language_atom = String.to_atom(language)
+
+    case ProjectScaffolder.scaffold_project(project_name, output_dir, language_atom) do
+      {:ok, created_files} ->
+        IO.puts([
+          IO.ANSI.green(),
+          "✓ Created #{language} project: #{project_name}",
+          IO.ANSI.reset()
+        ])
+
+        IO.puts("\nCreated files:")
+
+        Enum.each(created_files, fn file_path ->
+          relative_path = Path.relative_to(file_path, output_dir)
+          IO.puts("  • #{relative_path}")
+        end)
+
+        project_path = Path.join(output_dir, project_name)
+        IO.puts([IO.ANSI.cyan(), "\nProject location: #{project_path}\n", IO.ANSI.reset()])
+
+      {:error, :directory_exists} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error: Directory already exists. Use --force to overwrite.\n",
+          IO.ANSI.reset()
+        ])
+
+      {:error, :unsupported_language} ->
+        IO.puts([
+          IO.ANSI.red(),
+          "Error: Unsupported language. Supported: elixir, python, javascript, ruby\n",
+          IO.ANSI.reset()
+        ])
+
+      {:error, reason} ->
+        IO.puts([IO.ANSI.red(), "Error: #{inspect(reason)}\n", IO.ANSI.reset()])
+    end
   end
 end

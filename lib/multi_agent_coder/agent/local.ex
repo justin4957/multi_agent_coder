@@ -84,6 +84,18 @@ defmodule MultiAgentCoder.Agent.Local do
   end
 
   @doc """
+  Validates that the local server is accessible.
+  """
+  def validate_credentials(endpoint \\ @default_endpoint) do
+    url = "#{endpoint}/api/tags"
+
+    case HTTPClient.get_with_retry(url, [], timeout: 5_000, retry: [max_retries: 1]) do
+      {:ok, _} -> :ok
+      {:error, _} -> {:error, :local_server_unavailable}
+    end
+  end
+
+  @doc """
   Lists available models on the Ollama server.
   """
   def list_models(endpoint \\ @default_endpoint) do

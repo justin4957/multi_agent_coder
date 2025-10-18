@@ -13,7 +13,7 @@ defmodule MultiAgentCoder.Router.TaskRouter do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.Agent.Worker
+  alias MultiAgentCoder.Agent.{ProviderHealth, Worker}
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -42,8 +42,14 @@ defmodule MultiAgentCoder.Router.TaskRouter do
   @impl true
   def handle_call({:route, prompt, strategy, opts}, _from, state) do
     context = Keyword.get(opts, :context, %{})
+    skip_health_check = Keyword.get(opts, :skip_health_check, false)
 
     Logger.info("Routing task with strategy: #{inspect(strategy)}")
+
+    # Perform health check unless explicitly skipped
+    unless skip_health_check do
+      perform_health_check(strategy)
+    end
 
     result =
       case strategy do
@@ -58,6 +64,37 @@ defmodule MultiAgentCoder.Router.TaskRouter do
   end
 
   # Private Functions
+
+  defp perform_health_check(strategy) do
+    providers = get_requested_providers(strategy)
+    health_status = ProviderHealth.check_all_providers()
+
+    {healthy, failed} = ProviderHealth.filter_healthy_providers(providers, health_status)
+
+    if length(failed) > 0 do
+      Logger.warning("Provider health check found issues:")
+
+      Enum.each(failed, fn provider ->
+        error_reason = health_status[provider]
+        message = ProviderHealth.get_error_guidance(provider, elem(error_reason, 1))
+        Logger.warning(message)
+      end)
+
+      if length(healthy) == 0 do
+        Logger.error("No healthy providers available for routing!")
+      else
+        Logger.info("Continuing with #{length(healthy)} healthy provider(s): #{inspect(healthy)}")
+      end
+    else
+      Logger.info("All #{length(healthy)} provider(s) are healthy")
+    end
+  end
+
+  defp get_requested_providers(:all), do: get_active_providers()
+  defp get_requested_providers(:parallel), do: get_active_providers()
+  defp get_requested_providers(:sequential), do: get_active_providers()
+  defp get_requested_providers(:dialectical), do: get_active_providers()
+  defp get_requested_providers(providers) when is_list(providers), do: providers
 
   defp route_to_all(prompt, context) do
     providers = get_active_providers()
