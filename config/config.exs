@@ -44,6 +44,37 @@ config :multi_agent_coder,
   default_strategy: :all,
   timeout: 120_000
 
+# Configure local provider backend (use :iris for high-performance pipeline, :direct for basic)
+config :multi_agent_coder,
+  # Options: :iris or :direct
+  local_provider_backend: :iris,
+  iris_enabled: true
+
+# Configure Iris LLM Pipeline (if enabled)
+config :iris, :ollama,
+  endpoint: "http://localhost:11434",
+  default_model: "codellama:latest",
+  timeout: 120_000,
+  models: ["codellama:latest", "llama3", "mistral", "gemma"]
+
+config :iris, :cache,
+  backend: Nebulex.Adapters.Local,
+  default_ttl: 1800,
+  # 30 minutes cache
+  max_size: 1_000_000,
+  stats: true
+
+config :iris, :pipeline,
+  processor_stages: System.schedulers_online() * 2,
+  max_demand: 50,
+  batch_size: 100,
+  batch_timeout: 5_000
+
+config :iris, :load_balancer,
+  strategy: :round_robin,
+  # Options: :round_robin, :least_connections, :weighted
+  health_check_interval: 30_000
+
 # Configure PubSub for real-time updates
 config :multi_agent_coder, MultiAgentCoder.PubSub, adapter: Phoenix.PubSub.PG2
 

@@ -108,6 +108,8 @@ defmodule MultiAgentCoder.MixProject do
       {:req, "~> 0.4"},
       # JSON parsing
       {:jason, "~> 1.4"},
+      # High-performance LLM pipeline (optional)
+      {:iris, path: "../../ThoughtModeWorks/iris", optional: true},
       # Real-time updates and event broadcasting
       {:phoenix_pubsub, "~> 2.1"},
       # Pretty table formatting for CLI
