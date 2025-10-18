@@ -12,7 +12,7 @@ defmodule MultiAgentCoder.Agent.Worker do
   use GenServer
   require Logger
 
-  alias MultiAgentCoder.Agent.{Anthropic, DeepSeek, Local, OCI, OpenAI, Perplexity}
+  alias MultiAgentCoder.Agent.{Anthropic, DeepSeek, IrisProvider, Local, OCI, OpenAI, Perplexity}
 
   defstruct [
     :provider,
@@ -110,7 +110,7 @@ defmodule MultiAgentCoder.Agent.Worker do
         :deepseek -> DeepSeek.call(state, prompt, context)
         :perplexity -> Perplexity.call(state, prompt, context)
         :oci -> OCI.call(state, prompt, context)
-        :local -> Local.call(state, prompt, context)
+        :local -> call_local_provider(state, prompt, context)
       end
 
     final_state = %{new_state | status: :idle, current_task: nil}
@@ -139,8 +139,7 @@ defmodule MultiAgentCoder.Agent.Worker do
         :deepseek -> DeepSeek.call_streaming(state, prompt, context)
         :perplexity -> Perplexity.call_streaming(state, prompt, context)
         :oci -> OCI.call_streaming(state, prompt, context)
-        # Local doesn't support streaming yet
-        :local -> Local.call(state, prompt, context)
+        :local -> call_local_provider_streaming(state, prompt, context)
       end
 
     final_state = %{new_state | status: :idle, current_task: nil}
@@ -207,5 +206,57 @@ defmodule MultiAgentCoder.Agent.Worker do
   defp normalize_result(other) do
     # Unexpected format
     {:error, {:unexpected_response_format, other}}
+  end
+
+  # Helper to call local provider with configured backend (Iris or Direct)
+  defp call_local_provider(state, prompt, context) do
+    backend = Application.get_env(:multi_agent_coder, :local_provider_backend, :direct)
+    iris_enabled = Application.get_env(:multi_agent_coder, :iris_enabled, false)
+
+    case {backend, iris_enabled} do
+      {:iris, true} ->
+        # Try Iris first, fall back to direct if unavailable
+        case IrisProvider.validate_iris() do
+          :ok ->
+            Logger.info("#{state.provider}: Using Iris pipeline backend")
+            IrisProvider.call(state, prompt, context)
+
+          {:error, :iris_not_available} ->
+            Logger.warning("#{state.provider}: Iris not available, falling back to direct Ollama")
+
+            Local.call(state, prompt, context)
+        end
+
+      _ ->
+        # Direct mode or Iris disabled
+        Logger.debug("#{state.provider}: Using direct Ollama backend")
+        Local.call(state, prompt, context)
+    end
+  end
+
+  # Helper for streaming calls to local provider
+  defp call_local_provider_streaming(state, prompt, context) do
+    backend = Application.get_env(:multi_agent_coder, :local_provider_backend, :direct)
+    iris_enabled = Application.get_env(:multi_agent_coder, :iris_enabled, false)
+
+    case {backend, iris_enabled} do
+      {:iris, true} ->
+        # Try Iris streaming, fall back to direct if unavailable
+        case IrisProvider.validate_iris() do
+          :ok ->
+            Logger.info("#{state.provider}: Using Iris streaming backend")
+            IrisProvider.call_streaming(state, prompt, context)
+
+          {:error, :iris_not_available} ->
+            Logger.warning("#{state.provider}: Iris not available, falling back to direct Ollama")
+
+            Local.call(state, prompt, context)
+        end
+
+      _ ->
+        # Direct mode or Iris disabled
+        Logger.debug("#{state.provider}: Using direct Ollama backend")
+        Local.call(state, prompt, context)
+    end
   end
 end

@@ -44,6 +44,13 @@ config :multi_agent_coder,
   default_strategy: :all,
   timeout: 120_000
 
+# Configure local provider backend (use :iris for high-performance pipeline, :direct for basic)
+# Note: Iris configuration is done at runtime in IrisProvider module when Iris is available
+config :multi_agent_coder,
+  # Options: :iris or :direct (defaults to :direct if Iris unavailable)
+  local_provider_backend: :iris,
+  iris_enabled: true
+
 # Configure PubSub for real-time updates
 config :multi_agent_coder, MultiAgentCoder.PubSub, adapter: Phoenix.PubSub.PG2
 

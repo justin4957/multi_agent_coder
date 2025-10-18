@@ -103,7 +103,7 @@ defmodule MultiAgentCoder.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [
+    deps = [
       # HTTP client for API calls
       {:req, "~> 0.4"},
       # JSON parsing
@@ -125,5 +125,14 @@ defmodule MultiAgentCoder.MixProject do
       # Type checking with Dialyzer
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
+
+    # Add Iris if available locally (dev environment only)
+    iris_path = "../../ThoughtModeWorks/iris"
+
+    if File.exists?(iris_path) do
+      deps ++ [{:iris, path: iris_path, optional: true}]
+    else
+      deps
+    end
   end
 end
