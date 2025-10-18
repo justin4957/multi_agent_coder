@@ -195,9 +195,17 @@ defmodule MultiAgentCoder.Agent.IrisProvider do
         {:error, {:unexpected_response, other}}
     end
   rescue
+    error in [UndefinedFunctionError, ArgumentError] ->
+      Logger.error("IrisProvider: Iris module not available - #{Exception.message(error)}")
+      {:error, :iris_not_available}
+
     error ->
       Logger.error("IrisProvider: Pipeline error - #{Exception.message(error)}")
       {:error, {:pipeline_error, Exception.message(error)}}
+  catch
+    :exit, reason ->
+      Logger.error("IrisProvider: Iris process exited - #{inspect(reason)}")
+      {:error, :iris_not_available}
   end
 
   defp send_streaming_request_via_iris(iris_request) do
@@ -210,9 +218,20 @@ defmodule MultiAgentCoder.Agent.IrisProvider do
         {:error, {:iris_streaming_error, reason}}
     end
   rescue
+    error in [UndefinedFunctionError, ArgumentError] ->
+      Logger.error(
+        "IrisProvider: Iris module not available for streaming - #{Exception.message(error)}"
+      )
+
+      {:error, :iris_not_available}
+
     error ->
       Logger.error("IrisProvider: Streaming error - #{Exception.message(error)}")
       {:error, {:streaming_error, Exception.message(error)}}
+  catch
+    :exit, reason ->
+      Logger.error("IrisProvider: Iris streaming process exited - #{inspect(reason)}")
+      {:error, :iris_not_available}
   end
 
   defp extract_response(iris_response, state, original_prompt) do

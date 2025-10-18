@@ -219,11 +219,22 @@ defmodule MultiAgentCoder.Agent.Worker do
         case IrisProvider.validate_iris() do
           :ok ->
             Logger.info("#{state.provider}: Using Iris pipeline backend")
-            IrisProvider.call(state, prompt, context)
+
+            # Try Iris call with fallback on runtime errors
+            case IrisProvider.call(state, prompt, context) do
+              {:ok, _response, _usage} = success ->
+                success
+
+              {:error, reason} ->
+                Logger.warning(
+                  "#{state.provider}: Iris call failed (#{inspect(reason)}), falling back to direct Ollama"
+                )
+
+                Local.call(state, prompt, context)
+            end
 
           {:error, :iris_not_available} ->
             Logger.warning("#{state.provider}: Iris not available, falling back to direct Ollama")
-
             Local.call(state, prompt, context)
         end
 
@@ -245,11 +256,22 @@ defmodule MultiAgentCoder.Agent.Worker do
         case IrisProvider.validate_iris() do
           :ok ->
             Logger.info("#{state.provider}: Using Iris streaming backend")
-            IrisProvider.call_streaming(state, prompt, context)
+
+            # Try Iris streaming with fallback on runtime errors
+            case IrisProvider.call_streaming(state, prompt, context) do
+              {:ok, _stream} = success ->
+                success
+
+              {:error, reason} ->
+                Logger.warning(
+                  "#{state.provider}: Iris streaming failed (#{inspect(reason)}), falling back to direct Ollama"
+                )
+
+                Local.call(state, prompt, context)
+            end
 
           {:error, :iris_not_available} ->
             Logger.warning("#{state.provider}: Iris not available, falling back to direct Ollama")
-
             Local.call(state, prompt, context)
         end
 
