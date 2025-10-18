@@ -17,6 +17,44 @@ defmodule MultiAgentCoder.Agent.IrisProvider do
 
   alias MultiAgentCoder.Agent.{ContextFormatter, TokenCounter}
 
+  # Configure Iris at runtime if available
+  @doc false
+  def configure_iris do
+    if Code.ensure_loaded?(Iris) do
+      # Only configure if Iris is actually loaded
+      Application.put_env(:iris, :ollama, %{
+        endpoint: "http://localhost:11434",
+        default_model: "codellama:latest",
+        timeout: 120_000,
+        models: ["codellama:latest", "llama3", "mistral", "gemma"]
+      })
+
+      Application.put_env(:iris, :cache, %{
+        backend: Nebulex.Adapters.Local,
+        default_ttl: 1800,
+        # 30 minutes
+        max_size: 1_000_000,
+        stats: true
+      })
+
+      Application.put_env(:iris, :pipeline, %{
+        processor_stages: System.schedulers_online() * 2,
+        max_demand: 50,
+        batch_size: 100,
+        batch_timeout: 5_000
+      })
+
+      Application.put_env(:iris, :load_balancer, %{
+        strategy: :round_robin,
+        health_check_interval: 30_000
+      })
+
+      :ok
+    else
+      :iris_not_loaded
+    end
+  end
+
   @doc """
   Makes an API call to local LLM via Iris pipeline.
 
@@ -85,12 +123,17 @@ defmodule MultiAgentCoder.Agent.IrisProvider do
   end
 
   @doc """
-  Validates that Iris is available.
+  Validates that Iris is available and configures it.
   """
   def validate_iris do
     case check_iris_availability() do
-      {:ok, true} -> :ok
-      {:ok, false} -> {:error, :iris_not_available}
+      {:ok, true} ->
+        # Configure Iris runtime settings
+        configure_iris()
+        :ok
+
+      {:ok, false} ->
+        {:error, :iris_not_available}
     end
   end
 
