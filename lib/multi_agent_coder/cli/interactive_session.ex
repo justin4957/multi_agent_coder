@@ -30,7 +30,16 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   require Logger
 
   alias MultiAgentCoder.Agent.Worker
-  alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, History, REPL}
+
+  alias MultiAgentCoder.CLI.{
+    ConcurrentDisplay,
+    CommandExecutor,
+    CommandParser,
+    Formatter,
+    History,
+    REPL
+  }
+
   alias MultiAgentCoder.Task.{Allocator, Queue, Tracker}
   alias MultiAgentCoder.Task.Task, as: CodingTask
 
@@ -79,7 +88,11 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
       providers: providers,
       display_mode: display_mode,
       last_responses: %{},
-      last_prompt: nil
+      last_prompt: nil,
+      paused_providers: [],
+      current_strategy: :all,
+      focused_provider: nil,
+      options: %{}
     }
 
     interactive_loop(session_state)
@@ -111,6 +124,21 @@ defmodule MultiAgentCoder.CLI.InteractiveSession do
   end
 
   defp process_repl_command(prompt, state) do
+    # Parse the command using CommandParser
+    command = CommandParser.parse(prompt)
+
+    # Execute the command using CommandExecutor
+    case CommandExecutor.execute(command, state) do
+      {:continue, new_state} ->
+        interactive_loop(new_state)
+
+      {:exit} ->
+        :ok
+    end
+  end
+
+  # Keep the old implementation for reference but mark as deprecated
+  defp process_repl_command_legacy(prompt, state) do
     case parse_command(prompt) do
       {:exit} ->
         IO.puts("Goodbye!")
