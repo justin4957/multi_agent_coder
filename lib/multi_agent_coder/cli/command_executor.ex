@@ -705,19 +705,27 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
       IO.puts(["  • #{provider}: ", status_icon, focus_marker])
     end)
 
-    # Task queue status
-    queue_status = Queue.status()
+    # Task queue status (only if Queue is running)
+    case safe_queue_status() do
+      {:ok, queue_status} ->
+        IO.puts([
+          IO.ANSI.cyan(),
+          "\nTasks:",
+          IO.ANSI.reset()
+        ])
 
-    IO.puts([
-      IO.ANSI.cyan(),
-      "\nTasks:",
-      IO.ANSI.reset()
-    ])
+        IO.puts("  Pending: #{queue_status.pending}")
+        IO.puts("  Running: #{queue_status.running}")
+        IO.puts("  Completed: #{queue_status.completed}")
+        IO.puts("  Failed: #{queue_status.failed}")
 
-    IO.puts("  Pending: #{queue_status.pending}")
-    IO.puts("  Running: #{queue_status.running}")
-    IO.puts("  Completed: #{queue_status.completed}")
-    IO.puts("  Failed: #{queue_status.failed}")
+      {:error, :not_running} ->
+        IO.puts([
+          IO.ANSI.faint(),
+          "\nTasks: Queue not started",
+          IO.ANSI.reset()
+        ])
+    end
 
     # Strategy
     IO.puts([
@@ -729,56 +737,72 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
   end
 
   defp display_all_tasks do
-    all_tasks = Queue.list_all()
-
     IO.puts("\n#{Formatter.format_header("All Tasks")}")
 
-    if Enum.empty?(all_tasks.pending) and map_size(all_tasks.running) == 0 do
-      IO.puts("No active tasks")
-    end
+    case safe_queue_list_all() do
+      {:ok, all_tasks} ->
+        if Enum.empty?(all_tasks.pending) and map_size(all_tasks.running) == 0 do
+          IO.puts("No active tasks")
+        end
 
-    # Display pending
-    unless Enum.empty?(all_tasks.pending) do
-      IO.puts([IO.ANSI.yellow(), "\nPending (#{length(all_tasks.pending)}):", IO.ANSI.reset()])
+        # Display pending
+        unless Enum.empty?(all_tasks.pending) do
+          IO.puts([
+            IO.ANSI.yellow(),
+            "\nPending (#{length(all_tasks.pending)}):",
+            IO.ANSI.reset()
+          ])
 
-      all_tasks.pending
-      |> Enum.take(10)
-      |> Enum.each(fn task ->
-        IO.puts("  [#{task.id}] #{task.description}")
+          all_tasks.pending
+          |> Enum.take(10)
+          |> Enum.each(fn task ->
+            IO.puts("  [#{task.id}] #{task.description}")
 
-        IO.puts(
-          "    Priority: #{task.priority} | Assigned: #{Enum.join(task.assigned_to || [], ", ")}"
-        )
-      end)
-    end
+            IO.puts(
+              "    Priority: #{task.priority} | Assigned: #{Enum.join(task.assigned_to || [], ", ")}"
+            )
+          end)
+        end
 
-    # Display running
-    unless map_size(all_tasks.running) == 0 do
-      IO.puts([IO.ANSI.green(), "\nRunning (#{map_size(all_tasks.running)}):", IO.ANSI.reset()])
+        # Display running
+        unless map_size(all_tasks.running) == 0 do
+          IO.puts([
+            IO.ANSI.green(),
+            "\nRunning (#{map_size(all_tasks.running)}):",
+            IO.ANSI.reset()
+          ])
 
-      all_tasks.running
-      |> Map.values()
-      |> Enum.each(fn task ->
-        elapsed = CodingTask.elapsed_time(task) || 0
-        IO.puts("  [#{task.id}] #{task.description}")
+          all_tasks.running
+          |> Map.values()
+          |> Enum.each(fn task ->
+            elapsed = CodingTask.elapsed_time(task) || 0
+            IO.puts("  [#{task.id}] #{task.description}")
 
-        IO.puts(
-          "    Elapsed: #{div(elapsed, 1000)}s | Assigned: #{Enum.join(task.assigned_to || [], ", ")}"
-        )
-      end)
-    end
+            IO.puts(
+              "    Elapsed: #{div(elapsed, 1000)}s | Assigned: #{Enum.join(task.assigned_to || [], ", ")}"
+            )
+          end)
+        end
 
-    # Show counts for completed and failed
-    unless Enum.empty?(all_tasks.completed) do
-      IO.puts([
-        IO.ANSI.cyan(),
-        "\nCompleted: #{length(all_tasks.completed)}",
-        IO.ANSI.reset()
-      ])
-    end
+        # Show counts for completed and failed
+        unless Enum.empty?(all_tasks.completed) do
+          IO.puts([
+            IO.ANSI.cyan(),
+            "\nCompleted: #{length(all_tasks.completed)}",
+            IO.ANSI.reset()
+          ])
+        end
 
-    unless Enum.empty?(all_tasks.failed) do
-      IO.puts([IO.ANSI.red(), "Failed: #{length(all_tasks.failed)}", IO.ANSI.reset()])
+        unless Enum.empty?(all_tasks.failed) do
+          IO.puts([IO.ANSI.red(), "Failed: #{length(all_tasks.failed)}", IO.ANSI.reset()])
+        end
+
+      {:error, :not_running} ->
+        IO.puts([
+          IO.ANSI.yellow(),
+          "Task queue not started. No tasks to display.",
+          IO.ANSI.reset()
+        ])
     end
   end
 
@@ -824,26 +848,75 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
     IO.puts("\nUse 'watch #{provider}' for real-time logs")
   end
 
-  defp display_statistics(state) do
+  # Safe wrappers for Queue operations
+  defp safe_queue_status do
+    if Process.whereis(MultiAgentCoder.Task.Queue) do
+      try do
+        {:ok, Queue.status()}
+      rescue
+        _ -> {:error, :not_running}
+      catch
+        :exit, _ -> {:error, :not_running}
+      end
+    else
+      {:error, :not_running}
+    end
+  end
+
+  defp safe_queue_list_all do
+    if Process.whereis(MultiAgentCoder.Task.Queue) do
+      try do
+        {:ok, Queue.list_all()}
+      rescue
+        _ -> {:error, :not_running}
+      catch
+        :exit, _ -> {:error, :not_running}
+      end
+    else
+      {:error, :not_running}
+    end
+  end
+
+  defp safe_queue_get_task(task_id) do
+    if Process.whereis(MultiAgentCoder.Task.Queue) do
+      try do
+        Queue.get_task(task_id)
+      rescue
+        _ -> {:error, :not_found}
+      catch
+        :exit, _ -> {:error, :not_found}
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
+  defp display_statistics(_state) do
     IO.puts("\n#{Formatter.format_header("Session Statistics")}")
 
-    queue_status = Queue.status()
+    # Task statistics (only if Queue is running)
+    case safe_queue_status() do
+      {:ok, queue_status} ->
+        IO.puts([IO.ANSI.cyan(), "Tasks:", IO.ANSI.reset()])
+        IO.puts("  Total: #{queue_status.total}")
+        IO.puts("  Completed: #{queue_status.completed}")
+        IO.puts("  Failed: #{queue_status.failed}")
+
+        completion_rate =
+          if queue_status.total > 0 do
+            Float.round(queue_status.completed / queue_status.total * 100, 1)
+          else
+            0.0
+          end
+
+        IO.puts("  Success rate: #{completion_rate}%")
+
+      {:error, :not_running} ->
+        IO.puts([IO.ANSI.cyan(), "Tasks:", IO.ANSI.reset()])
+        IO.puts("  Queue not started")
+    end
+
     provider_stats = TaskTracker.get_all_provider_stats()
-
-    # Task statistics
-    IO.puts([IO.ANSI.cyan(), "Tasks:", IO.ANSI.reset()])
-    IO.puts("  Total: #{queue_status.total}")
-    IO.puts("  Completed: #{queue_status.completed}")
-    IO.puts("  Failed: #{queue_status.failed}")
-
-    completion_rate =
-      if queue_status.total > 0 do
-        Float.round(queue_status.completed / queue_status.total * 100, 1)
-      else
-        0.0
-      end
-
-    IO.puts("  Success rate: #{completion_rate}%")
 
     # Token usage
     total_tokens =
@@ -866,7 +939,7 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
   defp display_task_details(task_id) do
     IO.puts("\n#{Formatter.format_header("Task Details: #{task_id}")}")
 
-    case Queue.get_task(task_id) do
+    case safe_queue_get_task(task_id) do
       {:ok, task} ->
         IO.puts("ID: #{task.id}")
         IO.puts("Description: #{task.description}")
@@ -883,7 +956,7 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
         end
 
       {:error, :not_found} ->
-        IO.puts([IO.ANSI.red(), "Task not found", IO.ANSI.reset()])
+        IO.puts([IO.ANSI.red(), "Task not found or queue not running", IO.ANSI.reset()])
     end
   end
 
