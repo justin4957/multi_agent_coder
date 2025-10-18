@@ -98,9 +98,22 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
   end
 
   defp parse_code(content, file_type) do
-    # For non-Elixir files, use appropriate parsers
-    # This would integrate with language-specific parsers
-    {:ok, {:raw, content, file_type}}
+    # For non-Elixir files, use language-specific parsers via the registry
+    alias MultiAgentCoder.Merge.Parsers.ParserRegistry
+
+    case ParserRegistry.get_parser(file_type) do
+      {:ok, parser} ->
+        # Parse and return the AST-like structure
+        case parser.parse(content) do
+          {:ok, ast} -> {:ok, ast}
+          error -> error
+        end
+
+      {:error, :unsupported} ->
+        Logger.warning("No parser available for file type: #{file_type}")
+        # Fallback to raw content for unsupported types
+        {:ok, {:raw, content, file_type}}
+    end
   end
 
   defp analyze_all_versions(provider_changes) do
@@ -160,8 +173,18 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     |> Enum.uniq()
   end
 
+  defp extract_functions({:raw, _content, _file_type}) do
+    # For unsupported file types, return empty list
+    []
+  end
+
+  defp extract_functions(ast) when is_map(ast) do
+    # For parsed maps from language parsers, extract functions directly
+    Map.get(ast, "functions", [])
+  end
+
   defp extract_functions(ast) do
-    # Walk the AST and extract function definitions
+    # Walk the Elixir AST and extract function definitions
     functions = []
 
     Macro.prewalk(ast, functions, fn
@@ -191,6 +214,22 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     |> Enum.reverse()
   end
 
+  defp extract_modules({:raw, _content, _file_type}) do
+    # For unsupported file types, return empty list
+    []
+  end
+
+  defp extract_modules(ast) when is_map(ast) do
+    # For parsed maps from language parsers, extract modules/classes
+    modules = Map.get(ast, "modules", [])
+    classes = Map.get(ast, "classes", [])
+    structs = Map.get(ast, "structs", [])
+    interfaces = Map.get(ast, "interfaces", [])
+    traits = Map.get(ast, "traits", [])
+
+    modules ++ classes ++ structs ++ interfaces ++ traits
+  end
+
   defp extract_modules(ast) do
     modules = []
 
@@ -208,6 +247,16 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     end)
     |> elem(1)
     |> Enum.reverse()
+  end
+
+  defp extract_imports({:raw, _content, _file_type}) do
+    # For unsupported file types, return empty list
+    []
+  end
+
+  defp extract_imports(ast) when is_map(ast) do
+    # For parsed maps from language parsers, extract imports
+    Map.get(ast, "imports", [])
   end
 
   defp extract_imports(ast) do
@@ -231,6 +280,16 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     |> Enum.uniq()
   end
 
+  defp extract_dependencies({:raw, _content, _file_type}) do
+    # For unsupported file types, return empty list
+    []
+  end
+
+  defp extract_dependencies(ast) when is_map(ast) do
+    # For parsed maps from language parsers, extract dependencies
+    Map.get(ast, "dependencies", [])
+  end
+
   defp extract_dependencies(ast) do
     # Extract external dependencies and function calls
     deps = []
@@ -246,6 +305,16 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     |> elem(1)
     |> Enum.reverse()
     |> Enum.uniq()
+  end
+
+  defp detect_side_effects({:raw, _content, _file_type}) do
+    # For unsupported file types, return empty list
+    []
+  end
+
+  defp detect_side_effects(ast) when is_map(ast) do
+    # For parsed maps from language parsers, extract side effects
+    Map.get(ast, "sideEffects", []) || Map.get(ast, "side_effects", [])
   end
 
   defp detect_side_effects(ast) do
@@ -275,8 +344,18 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     |> Enum.uniq()
   end
 
+  defp calculate_complexity({:raw, _content, _file_type}) do
+    # For unsupported file types, return default complexity
+    1
+  end
+
+  defp calculate_complexity(ast) when is_map(ast) do
+    # For parsed maps from language parsers, get complexity directly
+    Map.get(ast, "complexity", 1)
+  end
+
   defp calculate_complexity(ast) do
-    # Calculate cyclomatic complexity
+    # Calculate cyclomatic complexity for Elixir AST
     complexity = 1
 
     Macro.prewalk(ast, complexity, fn
