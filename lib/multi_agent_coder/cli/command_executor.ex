@@ -9,13 +9,15 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
   require Logger
 
   alias MultiAgentCoder.Agent.{ProviderHealth, Worker}
-  alias MultiAgentCoder.Build.Runner, as: BuildRunner
+  alias MultiAgentCoder.Build.Monitor, as: BuildMonitor
   alias MultiAgentCoder.CLI.{ConcurrentDisplay, Formatter, Help}
   alias MultiAgentCoder.FileOps.{Diff, Tracker}
   alias MultiAgentCoder.Merge.{ConflictResolver, Engine}
+  alias MultiAgentCoder.Quality.Checker, as: QualityChecker
   alias MultiAgentCoder.Task.{Allocator, Queue}
-  alias MultiAgentCoder.Task.Tracker, as: TaskTracker
   alias MultiAgentCoder.Task.Task, as: CodingTask
+  alias MultiAgentCoder.Task.Tracker, as: TaskTracker
+  alias MultiAgentCoder.Test.{Comparator, Runner}
   alias MultiAgentCoder.Utils.{CodeExtractor, CodeValidator, ProjectScaffolder}
 
   @type session_state :: %{
@@ -1164,24 +1166,95 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
     IO.puts([IO.ANSI.green(), "No conflicts detected!", IO.ANSI.reset()])
   end
 
-  defp handle_build_all(_state) do
-    IO.puts("\n#{Formatter.format_header("Build All Providers")}")
-    IO.puts("Building code from all providers...")
+  defp handle_build_all(state) do
+    IO.puts("\n#{Formatter.format_header("Building All Providers")}")
+
+    # Get provider project directories
+    # For now, assume we're in a test scenario
+    # In production, this would come from file tracking
+    providers_and_dirs = get_provider_directories(state)
+
+    if map_size(providers_and_dirs) == 0 do
+      IO.puts([IO.ANSI.yellow(), "No provider code to build", IO.ANSI.reset()])
+    else
+      IO.puts("Building code for #{map_size(providers_and_dirs)} provider(s)...\n")
+
+      build_results = BuildMonitor.monitor_concurrent_builds(providers_and_dirs, broadcast: false)
+
+      # Display results
+      Enum.each(build_results, fn {provider, result} ->
+        case result do
+          {:ok, build_data} ->
+            display_build_result(provider, build_data)
+
+          {:error, reason} ->
+            IO.puts([
+              IO.ANSI.red(),
+              "✗ #{format_provider_name(provider)}: Build failed - #{inspect(reason)}",
+              IO.ANSI.reset()
+            ])
+        end
+
+        IO.puts("")
+      end)
+    end
   end
 
-  defp handle_test_all(_state) do
-    IO.puts("\n#{Formatter.format_header("Test All Providers")}")
-    IO.puts("Running tests for all provider implementations...")
+  defp handle_test_all(state) do
+    IO.puts("\n#{Formatter.format_header("Testing All Providers")}")
+
+    providers_and_dirs = get_provider_directories(state)
+
+    if map_size(providers_and_dirs) == 0 do
+      IO.puts([IO.ANSI.yellow(), "No provider code to test", IO.ANSI.reset()])
+    else
+      IO.puts("Running tests for #{map_size(providers_and_dirs)} provider(s)...\n")
+
+      test_results = Runner.run_concurrent_tests(providers_and_dirs, broadcast: false)
+
+      # Display results
+      Enum.each(test_results, fn {provider, result} ->
+        case result do
+          {:ok, test_data} ->
+            display_test_result(provider, test_data)
+
+          {:error, reason} ->
+            IO.puts([
+              IO.ANSI.red(),
+              "✗ #{format_provider_name(provider)}: Tests failed - #{inspect(reason)}",
+              IO.ANSI.reset()
+            ])
+        end
+
+        IO.puts("")
+      end)
+
+      # Show comparison if multiple providers
+      if map_size(test_results) > 1 do
+        build_results =
+          BuildMonitor.monitor_concurrent_builds(providers_and_dirs, broadcast: false)
+
+        comparison =
+          Comparator.compare_results(
+            Map.new(build_results, fn {p, {:ok, r}} -> {p, r} end),
+            Map.new(test_results, fn {p, {:ok, r}} -> {p, r} end)
+          )
+
+        IO.puts(Comparator.format_comparison(comparison))
+      end
+    end
   end
 
   defp handle_quality_checks do
     IO.puts("\n#{Formatter.format_header("Quality Checks")}")
-    IO.puts("Running code quality checks...")
+    IO.puts([IO.ANSI.yellow(), "Quality checks require provider directories", IO.ANSI.reset()])
+    IO.puts("Use: quality <provider> <project_dir>")
   end
 
   defp handle_show_failures do
-    IO.puts("\n#{Formatter.format_header("Failures Report")}")
+    IO.puts("\n#{Formatter.format_header("Test Failures Report")}")
     IO.puts("No failures to report")
+    IO.puts([IO.ANSI.faint(), "Run 'test' command to execute tests", IO.ANSI.reset()])
   end
 
   # Code extraction, validation, and scaffolding handlers
@@ -1338,5 +1411,122 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
       {:error, reason} ->
         IO.puts([IO.ANSI.red(), "Error: #{inspect(reason)}\n", IO.ANSI.reset()])
     end
+  end
+
+  # Helper functions for build/test monitoring
+
+  defp get_provider_directories(_state) do
+    # TODO: In production, this would track provider directories from the task execution
+    # For now, return empty map - users can manually specify directories
+    %{}
+  end
+
+  defp display_build_result(provider, build_data) do
+    provider_name = format_provider_name(provider)
+
+    if build_data.success do
+      IO.puts([
+        IO.ANSI.green(),
+        "✓ #{provider_name}: Build successful (#{build_data.duration}ms)",
+        IO.ANSI.reset()
+      ])
+
+      if length(build_data.warnings) > 0 do
+        IO.puts([
+          IO.ANSI.yellow(),
+          "  ⚠ #{length(build_data.warnings)} warning(s)",
+          IO.ANSI.reset()
+        ])
+
+        Enum.take(build_data.warnings, 3)
+        |> Enum.each(fn warning ->
+          IO.puts("    • #{warning}")
+        end)
+
+        if length(build_data.warnings) > 3 do
+          IO.puts([
+            IO.ANSI.faint(),
+            "    ... and #{length(build_data.warnings) - 3} more",
+            IO.ANSI.reset()
+          ])
+        end
+      end
+    else
+      IO.puts([
+        IO.ANSI.red(),
+        "✗ #{provider_name}: Build failed (#{build_data.duration}ms)",
+        IO.ANSI.reset()
+      ])
+
+      Enum.take(build_data.errors, 3)
+      |> Enum.each(fn error ->
+        IO.puts("  • #{error}")
+      end)
+
+      if length(build_data.errors) > 3 do
+        IO.puts([
+          IO.ANSI.faint(),
+          "  ... and #{length(build_data.errors) - 3} more errors",
+          IO.ANSI.reset()
+        ])
+      end
+    end
+  end
+
+  defp display_test_result(provider, test_data) do
+    provider_name = format_provider_name(provider)
+
+    if test_data.passed do
+      IO.puts([
+        IO.ANSI.green(),
+        "✓ #{provider_name}: All #{test_data.total} test(s) passed (#{test_data.duration}ms)",
+        IO.ANSI.reset()
+      ])
+
+      if test_data.coverage do
+        IO.puts([
+          IO.ANSI.cyan(),
+          "  Coverage: #{test_data.coverage}%",
+          IO.ANSI.reset()
+        ])
+      end
+    else
+      IO.puts([
+        IO.ANSI.red(),
+        "✗ #{provider_name}: #{test_data.failed_count} of #{test_data.total} test(s) failed (#{test_data.duration}ms)",
+        IO.ANSI.reset()
+      ])
+
+      if length(test_data.failures) > 0 do
+        IO.puts([IO.ANSI.yellow(), "  Failures:", IO.ANSI.reset()])
+
+        Enum.take(test_data.failures, 3)
+        |> Enum.each(fn failure ->
+          IO.puts("    • #{failure.test_name}")
+
+          if failure.location != "" do
+            IO.puts([IO.ANSI.faint(), "      #{failure.location}", IO.ANSI.reset()])
+          end
+        end)
+
+        if length(test_data.failures) > 3 do
+          IO.puts([
+            IO.ANSI.faint(),
+            "    ... and #{length(test_data.failures) - 3} more failures",
+            IO.ANSI.reset()
+          ])
+        end
+      end
+    end
+  end
+
+  defp format_provider_name(provider) when is_atom(provider) do
+    provider
+    |> to_string()
+    |> String.capitalize()
+  end
+
+  defp format_provider_name(provider) when is_binary(provider) do
+    String.capitalize(provider)
   end
 end
