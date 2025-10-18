@@ -488,16 +488,25 @@ defmodule MultiAgentCoder.Merge.MLResolver do
     import_similarity = compare_imports(analysis1.imports, analysis2.imports)
     complexity_similarity = compare_complexity(analysis1.complexity, analysis2.complexity)
 
-    # Weighted average
-    function_similarity * 0.5 +
-      import_similarity * 0.3 +
-      complexity_similarity * 0.2
+    # Only include imports in weighted average if at least one has imports
+    has_imports =
+      not Enum.empty?(analysis1.imports || []) or not Enum.empty?(analysis2.imports || [])
+
+    if has_imports do
+      # Weighted average with imports
+      function_similarity * 0.5 +
+        import_similarity * 0.3 +
+        complexity_similarity * 0.2
+    else
+      # Weighted average without imports (redistribute weight to functions)
+      function_similarity * 0.7 + complexity_similarity * 0.3
+    end
   end
 
   defp compare_functions(funcs1, funcs2) do
     if Enum.empty?(funcs1) and Enum.empty?(funcs2) do
-      # When both have no functions, return neutral score
-      0.5
+      # When both have no functions, that's a match
+      1.0
     else
       # Compare function signatures
       sigs1 =
@@ -516,7 +525,7 @@ defmodule MultiAgentCoder.Merge.MLResolver do
       if union_size > 0 do
         intersection_size / union_size
       else
-        0.5
+        1.0
       end
     end
   end
@@ -531,8 +540,8 @@ defmodule MultiAgentCoder.Merge.MLResolver do
     if union_size > 0 do
       intersection_size / union_size
     else
-      # When both have no imports, return neutral score (don't assume similarity)
-      0.5
+      # When both have no imports, that's a match
+      1.0
     end
   end
 
