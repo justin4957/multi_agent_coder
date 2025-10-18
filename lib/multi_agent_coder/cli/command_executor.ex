@@ -71,9 +71,14 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
     IO.puts([IO.ANSI.yellow(), "⏸  Pausing all providers...", IO.ANSI.reset()])
 
     Enum.each(state.providers, fn provider ->
-      Worker.pause(provider)
       IO.puts("   • #{provider} paused")
     end)
+
+    IO.puts([
+      IO.ANSI.faint(),
+      "\nNote: Providers are marked as paused. New tasks won't be assigned to them.",
+      IO.ANSI.reset()
+    ])
 
     new_state = %{state | paused_providers: state.providers}
     {:continue, new_state}
@@ -81,11 +86,15 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
 
   def execute({:pause, provider}, state) do
     if provider in state.providers do
-      Worker.pause(provider)
-
       IO.puts([
         IO.ANSI.yellow(),
         "⏸  Paused #{provider}",
+        IO.ANSI.reset()
+      ])
+
+      IO.puts([
+        IO.ANSI.faint(),
+        "Note: Provider is marked as paused. New tasks won't be assigned to it.",
         IO.ANSI.reset()
       ])
 
@@ -106,20 +115,29 @@ defmodule MultiAgentCoder.CLI.CommandExecutor do
     IO.puts([IO.ANSI.green(), "▶️  Resuming all providers...", IO.ANSI.reset()])
 
     Enum.each(state.paused_providers, fn provider ->
-      Worker.resume(provider)
       IO.puts("   • #{provider} resumed")
     end)
+
+    IO.puts([
+      IO.ANSI.faint(),
+      "\nNote: Providers are no longer marked as paused. They can receive new tasks.",
+      IO.ANSI.reset()
+    ])
 
     {:continue, %{state | paused_providers: []}}
   end
 
   def execute({:resume, provider}, state) do
     if provider in state.paused_providers do
-      Worker.resume(provider)
-
       IO.puts([
         IO.ANSI.green(),
         "▶️  Resumed #{provider}",
+        IO.ANSI.reset()
+      ])
+
+      IO.puts([
+        IO.ANSI.faint(),
+        "Note: Provider is no longer marked as paused. It can receive new tasks.",
         IO.ANSI.reset()
       ])
 
