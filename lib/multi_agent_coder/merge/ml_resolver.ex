@@ -176,19 +176,24 @@ defmodule MultiAgentCoder.Merge.MLResolver do
   # Private Functions
 
   defp assess_conflict_severity(conflict) do
-    factors = [
-      file_criticality(conflict.file),
-      change_magnitude(conflict),
-      provider_disagreement_level(conflict)
-    ]
+    file_crit = file_criticality(conflict.file)
+    change_mag = change_magnitude(conflict)
+    provider_disagreement = provider_disagreement_level(conflict)
 
-    avg_severity =
-      factors
-      |> Enum.map(&severity_to_number/1)
-      |> Enum.sum()
-      |> Kernel./(length(factors))
+    # If file is critical, ensure severity is at least high
+    if file_crit == :critical do
+      :critical
+    else
+      factors = [file_crit, change_mag, provider_disagreement]
 
-    number_to_severity(avg_severity)
+      avg_severity =
+        factors
+        |> Enum.map(&severity_to_number/1)
+        |> Enum.sum()
+        |> Kernel./(length(factors))
+
+      number_to_severity(avg_severity)
+    end
   end
 
   defp file_criticality(file_path) do
@@ -491,7 +496,8 @@ defmodule MultiAgentCoder.Merge.MLResolver do
 
   defp compare_functions(funcs1, funcs2) do
     if Enum.empty?(funcs1) and Enum.empty?(funcs2) do
-      1.0
+      # When both have no functions, return neutral score
+      0.5
     else
       # Compare function signatures
       sigs1 =
@@ -510,7 +516,7 @@ defmodule MultiAgentCoder.Merge.MLResolver do
       if union_size > 0 do
         intersection_size / union_size
       else
-        1.0
+        0.5
       end
     end
   end
@@ -525,7 +531,8 @@ defmodule MultiAgentCoder.Merge.MLResolver do
     if union_size > 0 do
       intersection_size / union_size
     else
-      1.0
+      # When both have no imports, return neutral score (don't assume similarity)
+      0.5
     end
   end
 
