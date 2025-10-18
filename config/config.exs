@@ -54,5 +54,23 @@ config :multi_agent_coder,
 # Configure PubSub for real-time updates
 config :multi_agent_coder, MultiAgentCoder.PubSub, adapter: Phoenix.PubSub.PG2
 
+# Configure tool execution and command approval
+config :multi_agent_coder, :tools,
+  # Approval mode: :auto | :prompt | :deny_all | :allow_all
+  approval_mode: :auto,
+  # Auto-approve safe commands (tests, git status, etc.)
+  auto_approve_safe: true,
+  # Prompt for warning commands (installs, commits)
+  prompt_on_warning: true,
+  # Always prompt for dangerous commands
+  always_prompt_dangerous: true,
+  # Remember approvals for the session
+  trust_for_session: true,
+  # Custom danger patterns (optional)
+  custom_safe_patterns: [],
+  custom_warning_patterns: [],
+  custom_dangerous_patterns: [],
+  custom_blocked_patterns: []
+
 # Import environment specific config
 import_config "#{config_env()}.exs"
