@@ -1,13 +1,14 @@
 defmodule MultiAgentCoder.Merge.CacheTest do
-  use ExUnit.Case, async: true
+  # Cannot be async since we're sharing a global Cache GenServer
+  use ExUnit.Case, async: false
 
   alias MultiAgentCoder.Merge.Cache
 
   setup do
-    # Start cache for each test
-    {:ok, pid} = start_supervised(Cache)
+    # Cache is already started by application supervisor
+    # Just clear it for each test
     Cache.clear()
-    {:ok, cache: pid}
+    :ok
   end
 
   describe "AST caching" do

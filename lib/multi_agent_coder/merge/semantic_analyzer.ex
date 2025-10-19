@@ -171,8 +171,10 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
             Cache.put_ast(content, ast)
             {:ok, ast}
 
-          {:error, {line, error, _}} ->
-            {:error, "Parse error at line #{line}: #{error}"}
+          {:error, {line_info, error, _}} ->
+            line = extract_line_number(line_info)
+            error_str = if is_binary(error), do: error, else: inspect(error)
+            {:error, "Parse error at line #{line}: #{error_str}"}
         end
     end
   end
@@ -619,4 +621,12 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
 
     complementary
   end
+
+  defp extract_line_number(line) when is_integer(line), do: line
+  defp extract_line_number([{:line, line} | _]), do: line
+
+  defp extract_line_number(keyword_list) when is_list(keyword_list),
+    do: Keyword.get(keyword_list, :line, 1)
+
+  defp extract_line_number(_), do: 1
 end

@@ -1,11 +1,12 @@
 defmodule MultiAgentCoder.Merge.SemanticAnalyzerTest do
-  use ExUnit.Case, async: true
+  # Cannot be async since we're sharing a global Cache GenServer
+  use ExUnit.Case, async: false
 
   alias MultiAgentCoder.Merge.{SemanticAnalyzer, Cache}
 
   setup do
-    # Start cache for each test
-    start_supervised(Cache)
+    # Cache is already started by application supervisor
+    # Just clear it for each test
     Cache.clear()
     :ok
   end
@@ -49,7 +50,8 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzerTest do
     end
 
     test "handles syntax errors gracefully" do
-      invalid_code = "defmodule Invalid do\n  this is not valid syntax\nend"
+      # Use actually invalid Elixir syntax - "end" alone is a syntax error
+      invalid_code = "end"
 
       assert {:error, error_msg} = SemanticAnalyzer.analyze_code(invalid_code, ".ex")
       assert is_binary(error_msg)
@@ -131,7 +133,7 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzerTest do
     test "handles mixed successful and failed analyses" do
       files = [
         {"valid.ex", "defmodule Valid do\nend", ".ex"},
-        {"invalid.ex", "this is invalid", ".ex"}
+        {"invalid.ex", "end", ".ex"}
       ]
 
       results = SemanticAnalyzer.analyze_files_parallel(files)
