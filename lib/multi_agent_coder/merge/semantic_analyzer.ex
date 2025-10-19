@@ -11,14 +11,36 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
 
   require Logger
 
+  alias MultiAgentCoder.Merge.Cache
+
   @type code_ast :: any()
   @type analysis_result :: {:ok, map()} | {:error, String.t()}
 
+  # Configuration for parallel processing
+  @max_concurrency 4
+  @task_timeout 30_000
+  @large_file_threshold_bytes 5 * 1024 * 1024
+
   @doc """
   Analyzes code semantically to understand its structure and intent.
+
+  Uses caching to avoid re-analyzing unchanged files.
   """
   @spec analyze_code(String.t(), String.t()) :: analysis_result()
   def analyze_code(content, file_type \\ ".ex") do
+    # Check cache first
+    case Cache.get_analysis(content) do
+      {:ok, cached_analysis} ->
+        Logger.debug("Cache hit for semantic analysis")
+        {:ok, cached_analysis}
+
+      :miss ->
+        Logger.debug("Cache miss - performing semantic analysis")
+        perform_analysis(content, file_type)
+    end
+  end
+
+  defp perform_analysis(content, file_type) do
     case parse_code(content, file_type) do
       {:ok, ast} ->
         analysis = %{
@@ -30,6 +52,8 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
           complexity: calculate_complexity(ast)
         }
 
+        # Cache the analysis result
+        Cache.put_analysis(content, analysis)
         {:ok, analysis}
 
       error ->
@@ -88,44 +112,135 @@ defmodule MultiAgentCoder.Merge.SemanticAnalyzer do
     end
   end
 
+  @doc """
+  Analyzes multiple files in parallel.
+
+  Returns a map of file paths to their analysis results.
+  Uses parallel processing for improved performance on large codebases.
+
+  ## Options
+    - `:max_concurrency` - Maximum number of concurrent analysis tasks (default: #{@max_concurrency})
+    - `:timeout` - Timeout per file in milliseconds (default: #{@task_timeout})
+  """
+  @spec analyze_files_parallel([{String.t(), String.t(), String.t()}], keyword()) ::
+          %{String.t() => analysis_result()}
+  def analyze_files_parallel(files, opts \\ []) do
+    max_concurrency = Keyword.get(opts, :max_concurrency, @max_concurrency)
+    timeout = Keyword.get(opts, :timeout, @task_timeout)
+
+    files
+    |> Task.async_stream(
+      fn {file_path, content, file_type} ->
+        result = analyze_code(content, file_type)
+        {file_path, result}
+      end,
+      max_concurrency: max_concurrency,
+      timeout: timeout,
+      on_timeout: :kill_task
+    )
+    |> Enum.map(fn
+      {:ok, {file_path, result}} -> {file_path, result}
+      {:exit, _reason} -> nil
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Map.new()
+  end
+
+  @doc """
+  Determines if a file is large and may benefit from streaming.
+  """
+  @spec is_large_file?(String.t()) :: boolean()
+  def is_large_file?(content) when is_binary(content) do
+    byte_size(content) > @large_file_threshold_bytes
+  end
+
   # Private functions
 
   defp parse_code(content, ".ex") do
-    case Code.string_to_quoted(content) do
-      {:ok, ast} -> {:ok, ast}
-      {:error, {line, error, _}} -> {:error, "Parse error at line #{line}: #{error}"}
+    # Check cache for parsed AST
+    case Cache.get_ast(content) do
+      {:ok, cached_ast} ->
+        Logger.debug("Cache hit for AST parsing")
+        {:ok, cached_ast}
+
+      :miss ->
+        Logger.debug("Cache miss - parsing code")
+
+        case Code.string_to_quoted(content) do
+          {:ok, ast} ->
+            Cache.put_ast(content, ast)
+            {:ok, ast}
+
+          {:error, {line, error, _}} ->
+            {:error, "Parse error at line #{line}: #{error}"}
+        end
     end
   end
 
   defp parse_code(content, file_type) do
-    # For non-Elixir files, use language-specific parsers via the registry
-    alias MultiAgentCoder.Merge.Parsers.ParserRegistry
+    # Check cache for parsed AST
+    case Cache.get_ast(content) do
+      {:ok, cached_ast} ->
+        Logger.debug("Cache hit for AST parsing (#{file_type})")
+        {:ok, cached_ast}
 
-    case ParserRegistry.get_parser(file_type) do
-      {:ok, parser} ->
-        # Parse and return the AST-like structure
-        case parser.parse(content) do
-          {:ok, ast} -> {:ok, ast}
-          error -> error
+      :miss ->
+        # For non-Elixir files, use language-specific parsers via the registry
+        alias MultiAgentCoder.Merge.Parsers.ParserRegistry
+
+        result =
+          case ParserRegistry.get_parser(file_type) do
+            {:ok, parser} ->
+              # Parse and return the AST-like structure
+              case parser.parse(content) do
+                {:ok, ast} -> {:ok, ast}
+                error -> error
+              end
+
+            {:error, :unsupported} ->
+              Logger.warning("No parser available for file type: #{file_type}")
+              # Fallback to raw content for unsupported types
+              {:ok, {:raw, content, file_type}}
+          end
+
+        # Cache successful parse results
+        case result do
+          {:ok, ast} -> Cache.put_ast(content, ast)
+          _ -> :ok
         end
 
-      {:error, :unsupported} ->
-        Logger.warning("No parser available for file type: #{file_type}")
-        # Fallback to raw content for unsupported types
-        {:ok, {:raw, content, file_type}}
+        result
     end
   end
 
   defp analyze_all_versions(provider_changes) do
+    # Use parallel processing for multiple providers
     analyzed =
       provider_changes
-      |> Enum.map(fn {provider, content} ->
-        case analyze_code(content) do
-          {:ok, analysis} -> {provider, analysis}
-          _ -> {provider, nil}
-        end
+      |> Task.async_stream(
+        fn {provider, content} ->
+          case analyze_code(content) do
+            {:ok, analysis} -> {provider, analysis}
+            _ -> {provider, nil}
+          end
+        end,
+        max_concurrency: @max_concurrency,
+        timeout: @task_timeout,
+        on_timeout: :kill_task
+      )
+      |> Enum.map(fn
+        {:ok, result} ->
+          result
+
+        {:exit, reason} ->
+          Logger.warning("Analysis task exited: #{inspect(reason)}")
+          nil
       end)
-      |> Enum.reject(fn {_, analysis} -> is_nil(analysis) end)
+      |> Enum.reject(fn
+        nil -> true
+        {_, nil} -> true
+        _ -> false
+      end)
       |> Map.new()
 
     if map_size(analyzed) == 0 do
