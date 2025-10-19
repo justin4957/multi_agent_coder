@@ -53,7 +53,10 @@ defmodule MultiAgentCoder.Application do
       MultiAgentCoder.Merge.PerformanceMonitor,
 
       # ML-based conflict resolution learning
-      MultiAgentCoder.Merge.PatternLearner
+      MultiAgentCoder.Merge.PatternLearner,
+
+      # Command approval tracking
+      MultiAgentCoder.Tools.ApprovalHistory
     ]
 
     opts = [strategy: :one_for_one, name: MultiAgentCoder.Supervisor]
