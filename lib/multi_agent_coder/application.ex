@@ -9,6 +9,8 @@ defmodule MultiAgentCoder.Application do
   - Real-time monitor for progress updates
   - Agent registry for discovery
   - PubSub for event broadcasting
+  - Merge optimization (cache and performance monitoring)
+  - ML-based pattern learning
   """
 
   use Application
@@ -45,6 +47,10 @@ defmodule MultiAgentCoder.Application do
       MultiAgentCoder.FileOps.History,
       MultiAgentCoder.FileOps.ConflictDetector,
       MultiAgentCoder.FileOps.Tracker,
+
+      # Merge optimization components
+      MultiAgentCoder.Merge.Cache,
+      MultiAgentCoder.Merge.PerformanceMonitor,
 
       # ML-based conflict resolution learning
       MultiAgentCoder.Merge.PatternLearner,

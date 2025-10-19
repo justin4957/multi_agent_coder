@@ -15,6 +15,7 @@ defmodule MultiAgentCoder.Merge.Engine do
   alias MultiAgentCoder.Merge.Strategy
   alias MultiAgentCoder.Merge.SemanticAnalyzer
   alias MultiAgentCoder.Merge.ConflictResolver
+  alias MultiAgentCoder.Merge.PerformanceMonitor
 
   require Logger
 
@@ -40,24 +41,52 @@ defmodule MultiAgentCoder.Merge.Engine do
   def merge_all(opts \\ []) do
     strategy = Keyword.get(opts, :strategy, :auto)
     interactive = Keyword.get(opts, :interactive, false)
+    operation_id = "merge_#{System.unique_integer([:positive])}"
 
     Logger.info("Starting merge with strategy: #{strategy}")
+    PerformanceMonitor.start_operation(operation_id)
 
-    with {:ok, providers} <- get_active_providers(),
-         {:ok, file_changes} <- collect_file_changes(providers),
-         {:ok, conflicts} <- detect_conflicts(file_changes),
-         {:ok, resolved} <- resolve_conflicts(conflicts, strategy, interactive),
-         {:ok, merged} <- apply_merges(file_changes, resolved) do
-      if Keyword.get(opts, :run_tests, false) do
-        run_and_compare_tests(merged, providers)
+    result =
+      with {:ok, providers} <-
+             track_phase(operation_id, :get_providers, fn -> get_active_providers() end),
+           {:ok, file_changes} <-
+             track_phase(operation_id, :collect_changes, fn ->
+               collect_file_changes(providers)
+             end),
+           {:ok, conflicts} <-
+             track_phase(operation_id, :detect_conflicts, fn -> detect_conflicts(file_changes) end),
+           {:ok, resolved} <-
+             track_phase(operation_id, :resolve_conflicts, fn ->
+               resolve_conflicts(conflicts, strategy, interactive)
+             end),
+           {:ok, merged} <-
+             track_phase(operation_id, :apply_merges, fn ->
+               apply_merges(file_changes, resolved)
+             end) do
+        if Keyword.get(opts, :run_tests, false) do
+          track_phase(operation_id, :run_tests, fn ->
+            run_and_compare_tests(merged, providers)
+          end)
+        end
+
+        {:ok, merged}
+      else
+        {:error, reason} = error ->
+          Logger.error("Merge failed: #{reason}")
+          error
       end
 
-      {:ok, merged}
-    else
-      {:error, reason} = error ->
-        Logger.error("Merge failed: #{reason}")
-        error
+    # Generate performance report
+    files_count =
+      if is_tuple(result) and elem(result, 0) == :ok, do: map_size(elem(result, 1)), else: 0
+
+    report = PerformanceMonitor.complete_operation(operation_id, %{files_processed: files_count})
+
+    if Keyword.get(opts, :show_performance, false) do
+      IO.puts("\n" <> PerformanceMonitor.Report.format(report))
     end
+
+    result
   end
 
   @doc """
@@ -299,5 +328,9 @@ defmodule MultiAgentCoder.Merge.Engine do
     # This would integrate with the build/test system
     # For now, just log
     {:ok, :tests_passed}
+  end
+
+  defp track_phase(operation_id, phase_name, func) do
+    PerformanceMonitor.track_phase(operation_id, phase_name, %{}, func)
   end
 end
